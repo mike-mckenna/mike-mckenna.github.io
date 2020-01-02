@@ -1,0 +1,1011 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta http-equiv="content-type" content="text/html; charset=UTF-8" />
+    <meta name="author" content="Mike McKenna">
+    <title>A WebGL2 Stereo Exercise</title>
+
+    <style>
+      body
+      {
+        text-align: center;
+
+        /* Turn off highlighting during mouse drag. */
+        -khtml-user-select: none;
+        -moz-user-select: none;
+        -ms-user-select: none;
+        -webkit-touch-callout: none;
+        -webkit-user-select: none;
+        user-select: none;
+      }
+      table {
+        border-collapse: collapse;
+        margin: auto;
+        text-align: left;
+      }
+      button {
+        width: 120px;
+        margin-top: 6px;
+        margin-bottom: 7px;
+      }
+      .thin-box
+      {
+        border: solid;
+        border-width: thin;
+      }
+      .tr-align-top {
+        vertical-align: top;
+      }
+      .tr-min-height {
+        height: 30px;
+      }
+      .td-padding {
+        padding: 8px;
+      }
+      .slider-input {
+        width: 120px;
+      }
+      .slider-text {
+        min-width: 20px;
+      }
+    </style>
+  </head>
+
+  <body onload="startGraphics()">
+    <h2>A WebGL2 Stereo Exercise</h2>
+    Click on the image and drag.<br>
+    <canvas id="theCanvas" width="480" height="320"></canvas>
+
+    <!-- Use tables to better align html elements. Consider using more CSS. -->
+    <table>
+      <tr class="tr-align-top">
+        <td class="thin-box">
+          <table>
+            <tr class="tr-align-top">
+              <td class="td-padding">
+                <input type="radio" name="stereoModeGroup" checked
+                       value="stereo"    onclick="draw()"> Stereo<br>
+                <input type="radio" name="stereoModeGroup"
+                       value="mono"      onclick="draw()"> Mono<br>
+                <input type="radio" name="stereoModeGroup"
+                       value="largeMono" onclick="draw()"> Large Mono
+              </td>
+              <td class="td-padding">
+                <input type="radio" name="displayTypeGroup" checked
+                       value="opaqueCube"   onclick="draw()"
+                       >Opaque Cube<br>
+                <input type="radio" name="displayTypeGroup"
+                       value="linesAndPoints" onclick="draw()"
+                       >Lines &amp; Points<br>
+              </td>
+              <td class="td-padding">
+                <input type="radio" name="backgroundGroup" checked
+                       value="white" onclick="draw()">White BackGround<br>
+                <input type="radio" name="backgroundGroup"
+                       value="black" onclick="draw()">Black BackGround<br>
+              </td>
+            </tr>
+          </table>
+        </td>
+        <td class="thin-box td-padding">
+          <button id="autoRotateButton" onclick="clickAutoRotate()"
+                  >Run Auto Rotate</button><br>
+          <output id="fpsText"></output>
+        </td>
+      </tr>
+      <tr class="thin-box">
+        <td class="td-padding">
+          <table>
+            <tr class="tr-min-height">
+              <td colspan="3">Lines &amp; Points Settings:</td>
+            </tr>
+            <tr class="tr-min-height">
+              <td>Points Along Edge</td>
+              <td>
+                <input id="pointsAlongEdgeSlider" type="range"
+                       class="slider-input" value="2" min="0" max="32" step="1"
+                       oninput="setPointsAlongEdge(); draw()">
+              </td>
+              <td class="slider-text">
+                <output id="pointsAlongEdgeText">2</output>
+              </td>
+            </tr>
+            <tr class="tr-min-height">
+              <td>Point Size</td>
+              <td>
+                <input id="pointSizeSlider" type="range" class="slider-input"
+                       value="3.0" min="0" max="8" step="0.1"
+                       oninput="setPointSize(); draw()">
+              </td>
+              <td class="slider-text">
+                <output id="pointSizeText">2.0</output>
+              </td>
+            </tr>
+          </table>
+        </td>
+        <td class="td-padding">
+          <button onclick="resetSliders()">Reset Sliders</button>
+        </td>
+      </tr>
+    </table>
+
+    <div style="line-height: 6px">&nbsp;</div>
+
+    <table>
+      <tr class="tr-align-top">
+        <td>WebGL renderer:</td>
+        <td><output id="webglRenderer">unknown</output></td>
+      </tr>
+      <tr class="tr-align-top">
+        <td>WebGL vendor:</td>
+        <td><output id="webglVendor">unknown</output></td>
+      </tr>
+      <tr><td>&nbsp;</td></tr>
+      <tr>
+        <td colspan="2">Other exercises are <a href="index.html">here</a>.</td>
+      </tr>
+    </table>
+  </body>
+
+  <script>
+    "use strict"
+
+    // The javascript here forgoes three.js to more closely play with WebGL.
+
+    const STEREO_MODE      = "stereo";
+    const MONO_MODE        = "mono";
+    const LARGE_MONO_MODE  = "largeMono";
+
+    const OPAQUE_CUBE      = "opaqueCube";
+    const LINES_AND_POINTS = "linesAndPoints";
+
+    const WHITE            = "white";
+    const BLACK            = "black";
+
+    const VIEWER_Z = 10.0;
+    const SQRT_3   = Math.sqrt(3.0);
+
+    // Matrix of accumulated rotations, in column major order:
+    const R = [1.0, 0.0, 0.0,  0.0, 1.0, 0.0,  0.0, 0.0, 1.0];
+
+    // Define the cube corners, edges, and faces.
+    // The unrotated corners are at these locations:
+    //
+    //  6-------7
+    //  |\     /|
+    //  | 2---3 |
+    //  | |   | |
+    //  | 0---1 |
+    //  |/     \|
+    //  4-------5
+
+    const numCorners =  8;
+    const numEdges   = 12;
+
+    const corners = [
+      [ -1.0, -1.0, -1.0 ], // left  down back
+      [  1.0, -1.0, -1.0 ], // right down back
+      [ -1.0,  1.0, -1.0 ], // left  up   back
+      [  1.0,  1.0, -1.0 ], // right up   back
+      [ -1.0, -1.0,  1.0 ], // left  down front
+      [  1.0, -1.0,  1.0 ], // right down front
+      [ -1.0,  1.0,  1.0 ], // left  up   front
+      [  1.0,  1.0,  1.0 ]  // right up   front
+    ];
+
+    // For each edge, define the corners at the two ends:
+    const edgeCorners = [
+      [ 0, 1 ],
+      [ 2, 3 ],
+      [ 4, 5 ],
+      [ 6, 7 ],
+
+      [ 0, 2 ],
+      [ 1, 3 ],
+      [ 4, 6 ],
+      [ 5, 7 ],
+
+      [ 0, 4 ],
+      [ 1, 5 ],
+      [ 2, 6 ],
+      [ 3, 7 ]
+    ];
+
+    const faceNormals = [
+      [ -1.0, 0.0, 0.0 ], // left  face
+      [  1.0, 0.0, 0.0 ], // right face
+
+      [  0.0,-1.0, 0.0 ], // down  face
+      [  0.0, 1.0, 0.0 ], // up    face
+
+      [  0.0, 0.0,-1.0 ], // back  face
+      [  0.0, 0.0, 1.0 ]  // front face
+    ];
+
+    // For each edge, define the two adjacent faces:
+    const edgeAdjacentFaces = [
+      [ 2, 4 ],
+      [ 3, 4 ],
+      [ 2, 5 ],
+      [ 3, 5 ],
+
+      [ 0, 4 ],
+      [ 1, 4 ],
+      [ 0, 5 ],
+      [ 1, 5 ],
+
+      [ 0, 2 ],
+      [ 1, 2 ],
+      [ 0, 3 ],
+      [ 1, 3 ]
+    ];
+
+    // For the two triangles on each cube face, define indices to cube corners:
+    const triangleCorners = [
+      0, 4, 6,  6, 2, 0,  // left  face
+      1, 3, 7,  7, 5, 1,  // right face
+
+      0, 1, 5,  5, 4, 0,  // down  face
+      2, 6, 7,  7, 3, 2,  // up    face
+
+      0, 2, 3,  3, 1, 0,  // back  face
+      4, 5, 7,  7, 6, 4   // front face
+    ];
+
+    // color variables
+    //
+    const rgbScheme = [
+      1.0, 0.0, 0.0, // red
+      0.0, 1.0, 0.0, // blue
+      0.0, 0.0, 1.0  // green
+    ];
+    const blackOnWhiteScheme = [
+      0.0, 0.0, 0.0, // black
+      0.8, 0.8, 0.8, // dimmed
+      1.0, 1.0, 1.0  // white
+    ];
+    const whiteOnBlackScheme = [
+      1.0, 1.0, 1.0, // white
+      0.3, 0.3, 0.3, // dimmed
+      0.0, 0.0, 0.0  // black
+    ];
+
+    // variables around the html elements
+    //
+    var   pointsAlongEdgeSlider;
+    var   pointsAlongEdgeText;
+    var   pointsAlongEdge = -1;
+    var   numPoints;
+
+    var   pointSizeSlider;
+    var   pointSizeText;
+
+    // variables for stereo mode:
+    var   canvasWidth  = -1;
+    var   canvasHeight = -1;
+    var   stereoMode   = "";
+    var   pixelEdgeLength;
+    var   eyeSeparation;
+    var   cubeRange; // unrotated cube spans [-cubeRange,cubeRange] along x,y,z.
+    var   cubeCenterZ;
+    var   distanceEyeToCubeCtr;
+    var   uniformStereoParams;
+
+    // variables for auto rotate:
+    var   autoRotateButton;
+    const runAutoRotateText   = "Run Auto Rotate";
+    const stopAutoRotateText  = "Stop Auto Rotate";
+    var   autoRotateIsRunning = false;
+    var   fpsText;
+    var   fpsCount;
+    var   fpsStartTime;
+
+    // variables for Webgl:
+    var   gl;
+    var   cubeCenterZLoc;
+    var   aspectAdjustLoc;
+    var   colorSchemeLoc;
+    var   pointSizeLoc;
+    var   stereoParamsLoc;
+    var   RLoc;
+    var   startAndDeltaLoc;
+
+    // Define vertex arrays.  Data sizes are doubled for stereo.
+
+    const EDGE_UINTS = 8;
+    const edgeData  = new Uint8Array(numEdges * EDGE_UINTS * 2);
+
+    const POINT_UINTS = 4;
+    var   pointData;
+
+    const triangleData = new Uint8Array(triangleCorners.length
+                                        * POINT_UINTS * 2);
+
+    // variables for mouse actions:
+    var   mouseIsDown = false;
+    var   prevMouseX;
+    var   prevMouseY;
+
+    // flags
+    const SCHEME_COLOR_MASK = 0x0F;
+    const RIGHT_EYE_BIT     = 0x10;
+
+    //
+    // Main function.
+    //
+
+    function startGraphics()
+    {
+      //
+      // Initialize webgl2.
+      //
+
+      gl = document.getElementById("theCanvas").getContext("webgl2");
+      if (!gl)
+      {
+        const errorMsg = "ERROR: This browser does not offer a webgl2 context.";
+        console.log(errorMsg);
+        alert(errorMsg);
+        return;
+      }
+
+      gl.clearColor(1.0, 1.0, 1.0, 1.0); // Start with white.
+
+      // Get the renderer and vendor debug info.
+      const rendererInfo = gl.getExtension("WEBGL_debug_renderer_info");
+      if (rendererInfo)
+      {
+        document.getElementById("webglRenderer").value =
+          gl.getParameter(rendererInfo.UNMASKED_RENDERER_WEBGL);
+        document.getElementById("webglVendor").value =
+          gl.getParameter(rendererInfo.UNMASKED_VENDOR_WEBGL);
+      }
+
+      // Get some of the html items.
+      //
+      pointsAlongEdgeSlider = document.getElementById("pointsAlongEdgeSlider");
+      pointsAlongEdgeText   = document.getElementById("pointsAlongEdgeText");
+      pointSizeSlider       = document.getElementById("pointSizeSlider");
+      pointSizeText         = document.getElementById("pointSizeText");
+      autoRotateButton      = document.getElementById("autoRotateButton");
+      fpsText               = document.getElementById("fpsText");
+
+      //
+      // Compile the shaders.
+      // (To preserve readability, do not collapse the 2 compiles into a loop.)
+      //
+
+      const vertexShader = gl.createShader(gl.VERTEX_SHADER);
+      gl.shaderSource(vertexShader,
+                      document.getElementById("vertexShaderCode").innerHTML);
+      gl.compileShader(vertexShader);
+      if (!gl.getShaderParameter(vertexShader, gl.COMPILE_STATUS))
+      {
+        const errorMsg = "ERROR: Failed to compile vertex shader: " +
+                         gl.getShaderInfoLog(vertexShader);
+        console.log(errorMsg);
+        alert(errorMsg);
+        return;
+      }
+
+      const fragmentShader = gl.createShader(gl.FRAGMENT_SHADER);
+      gl.shaderSource(fragmentShader,
+                      document.getElementById("fragmentShaderCode").innerHTML);
+      gl.compileShader(fragmentShader);
+      if (!gl.getShaderParameter(fragmentShader, gl.COMPILE_STATUS))
+      {
+        const errorMsg = "ERROR: Failed to compile fragment shader: " +
+                         gl.getShaderInfoLog(fragmentShader);
+        console.log(errorMsg);
+        alert(errorMsg);
+        return;
+      }
+
+      const program = gl.createProgram();
+      gl.attachShader(program, vertexShader);
+      gl.attachShader(program, fragmentShader);
+      gl.linkProgram(program);
+
+      //
+      // Set up a few things that won't change.
+      //
+
+      gl.useProgram(program);
+      gl.enable(gl.DEPTH_TEST);
+
+      gl.uniform1f(gl.getUniformLocation(program, "viewerZ"), VIEWER_Z);
+
+      cubeCenterZLoc   = gl.getUniformLocation(program, "cubeCenterZ");
+      aspectAdjustLoc  = gl.getUniformLocation(program, "aspectAdjust");
+      colorSchemeLoc   = gl.getUniformLocation(program, "colorScheme");
+      pointSizeLoc     = gl.getUniformLocation(program, "pointSize");
+      stereoParamsLoc  = gl.getUniformLocation(program, "stereoParams");
+      RLoc             = gl.getUniformLocation(program, "R");
+      startAndDeltaLoc = gl.getUniformLocation(program, "startAndDelta");
+
+      gl.bindVertexArray(gl.createVertexArray());
+      gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
+
+      const positionLoc = gl.getAttribLocation(program, "position");
+      gl.enableVertexAttribArray(positionLoc);
+      gl.vertexAttribIPointer(positionLoc, POINT_UINTS, gl.UNSIGNED_BYTE,
+                                           POINT_UINTS, 0);
+
+      // Define edge data, two corners per edge.
+      //
+      var leftIdx  = 0;
+      var rightIdx = (edgeData.length >> 1); // right eye data in upper half
+      var i;
+      for (i = 0; i < numEdges; ++i)
+      {
+        var ci;
+        for (ci = 0; ci < 2; ++ci)
+        {
+          const cornerIdx = edgeCorners[i][ci];
+
+          edgeData[leftIdx++ ] = edgeData[rightIdx++] =   cornerIdx & 1;
+          edgeData[leftIdx++ ] = edgeData[rightIdx++] = ((cornerIdx & 2) >> 1);
+          edgeData[leftIdx++ ] = edgeData[rightIdx++] = ((cornerIdx & 4) >> 2);
+
+          edgeData[leftIdx++ ] = 0;
+          edgeData[rightIdx++] = RIGHT_EYE_BIT;
+        }
+      }
+
+      // Define triangle data.
+      //
+      leftIdx  = 0;
+      rightIdx = (triangleData.length >> 1); // right eye data in upper half
+      for (i = 0; i < triangleCorners.length; ++i)
+      {
+        const cIdx = triangleCorners[i];
+        const faceColor = Math.floor(i / 12); // 0 (red), 1 (green), or 2 (blue)
+
+        triangleData[leftIdx++]  = triangleData[rightIdx++] =   cIdx & 1;
+        triangleData[leftIdx++]  = triangleData[rightIdx++] = ((cIdx & 2) >> 1);
+        triangleData[leftIdx++]  = triangleData[rightIdx++] = ((cIdx & 4) >> 2);
+
+        triangleData[leftIdx++ ] = faceColor;
+        triangleData[rightIdx++] = faceColor + RIGHT_EYE_BIT;
+      }
+
+      // Define interior point data.
+      setPointsAlongEdge();
+
+      // Draw the first image.
+      //
+      rotate( [ 0, 0, 1 ], [ 0.16, -0.15, 1 ] );
+      draw();
+
+      // Define functions that will respond to mouse actions and redraw.
+      gl.canvas.onmousedown = mouseDownEvent;
+      document.onmouseup    = mouseUpEvent;
+      document.onmousemove  = mouseMoveEvent;
+    }
+
+    function rotate(fromV, toV)
+    {
+      // Convert vector-to-vector pivot into rotation matrix deltaR.
+
+      const cosTheta =
+        dotProduct(fromV, toV) /
+        Math.sqrt(dotProduct(fromV, fromV) * dotProduct(toV, toV));
+      const kos = 1 - cosTheta;
+
+      const temp = 1 - cosTheta * cosTheta;
+      const sinTheta = ((temp > 0.0) ? Math.sqrt(temp) : 0.0);
+
+      const axis = [(fromV[1] * toV[2]) - (fromV[2] * toV[1]),
+                    (fromV[2] * toV[0]) - (fromV[0] * toV[2]),
+                    (fromV[0] * toV[1]) - (fromV[1] * toV[0])];
+      const axisLen = Math.sqrt(dotProduct(axis, axis));
+      axis[0] /= axisLen;
+      axis[1] /= axisLen;
+      axis[2] /= axisLen;
+
+      // Define matrix deltaR in column-major order in case we send it to GLSL.
+      const deltaR = [
+        kos * axis[0] * axis[0] + cosTheta,
+        kos * axis[0] * axis[1] + sinTheta * axis[2],
+        kos * axis[0] * axis[2] - sinTheta * axis[1],
+
+        kos * axis[0] * axis[1] - sinTheta * axis[2],
+        kos * axis[1] * axis[1] + cosTheta,
+        kos * axis[1] * axis[2] + sinTheta * axis[0],
+
+        kos * axis[0] * axis[2] + sinTheta * axis[1],
+        kos * axis[1] * axis[2] - sinTheta * axis[0],
+        kos * axis[2] * axis[2] + cosTheta
+      ];
+
+      // Apply deltaR to accumulated rotation R.
+      var i;
+      for (i = 0; i < 9; i += 3)
+      {
+        const old0 = R[i    ];
+        const old1 = R[i + 1];
+        const old2 = R[i + 2];
+        R[i    ] = deltaR[0] * old0 + deltaR[3] * old1 + deltaR[6] * old2;
+        R[i + 1] = deltaR[1] * old0 + deltaR[4] * old1 + deltaR[7] * old2;
+        R[i + 2] = deltaR[2] * old0 + deltaR[5] * old1 + deltaR[8] * old2;
+      }
+    }
+
+    function draw()
+    {
+      getDisplayAttributes();
+
+      const background =
+        document.querySelector('input[name="backgroundGroup"]:checked').value;
+      switch(background)
+      {
+        case WHITE: gl.clearColor(1.0, 1.0, 1.0, 1.0); break;
+        case BLACK: gl.clearColor(0.0, 0.0, 0.0, 1.0); break;
+        default:
+          const errorMsg = "ERROR: Background color is unexpected value '"
+                           + background + "'";
+          console.log(errorMsg);
+          alert(errorMsg);
+          return;
+      }
+
+      const displayType =
+        document.querySelector('input[name="displayTypeGroup"]:checked').value
+      switch(displayType)
+      {
+        case OPAQUE_CUBE:
+          break;
+        case LINES_AND_POINTS:
+          dimBackEdges();
+          break;
+        default:
+          const errorMsg = "ERROR: Display type is unexpected value '"
+                           + displayType + "'";
+          console.log(errorMsg);
+          alert(errorMsg);
+          return;
+      }
+
+      // To be safe, we set uniforms only after we have cleared the image.
+      // (Could setting uniforms before clearing the image affect images that
+      //  are still in the pipeline?  Maybe not, but let's be safe anyway.)
+      //
+      gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+      // Determine the aspect ratio.
+      gl.viewport(0, 0, canvasWidth, canvasHeight);
+      if (canvasHeight < canvasWidth)
+      {
+        gl.uniform2f(aspectAdjustLoc, canvasWidth / canvasHeight, 1.0);
+      }
+      else
+      {
+        gl.uniform2f(aspectAdjustLoc, 1.0, canvasHeight / canvasWidth);
+      }
+
+      // Send other uniform data to the GPU.
+      gl.uniform1f(cubeCenterZLoc, cubeCenterZ);
+      gl.uniform2f(startAndDeltaLoc, -cubeRange, 2 * cubeRange);
+      gl.uniform1f(pointSizeLoc, pointSizeSlider.value)
+      gl.uniform3fv(stereoParamsLoc, uniformStereoParams);
+      gl.uniformMatrix3fv(RLoc, false, R);
+
+      //
+      // Draw faces, or edges and points.
+      //
+
+      switch(displayType)
+      {
+        case OPAQUE_CUBE:
+          gl.uniformMatrix3fv(colorSchemeLoc, false, rgbScheme);
+
+          // Draw faces.
+          gl.bufferData(gl.ARRAY_BUFFER, triangleData, gl.DYNAMIC_DRAW);
+          gl.drawArrays(gl.TRIANGLES, 0,
+            ((stereoMode == STEREO_MODE) ? (triangleCorners.length * 2)
+                                         :  triangleCorners.length      ));
+          break;
+
+        case LINES_AND_POINTS:
+          gl.uniformMatrix3fv(colorSchemeLoc, false,
+            (background == WHITE) ? blackOnWhiteScheme : whiteOnBlackScheme);
+
+          // Draw lines.
+          gl.bufferData(gl.ARRAY_BUFFER, edgeData, gl.DYNAMIC_DRAW);
+          gl.drawArrays(gl.LINES , 0,
+            ((stereoMode == STEREO_MODE) ? (numEdges * 4) : (numEdges * 2)));
+
+          // Draw points.
+          if ((pointsAlongEdge > 0) && (pointSizeSlider.value > 0.0))
+          {
+            const pointCoordDelta = 2.0 * cubeRange / pointsAlongEdge;
+            const pointFirstCoord = -cubeRange + pointCoordDelta * 0.5;
+            gl.uniform2f(startAndDeltaLoc, pointFirstCoord, pointCoordDelta);
+
+            gl.bufferData(gl.ARRAY_BUFFER, pointData, gl.DYNAMIC_DRAW);
+            gl.drawArrays(gl.POINTS, 0,
+              ((stereoMode == STEREO_MODE) ? (numPoints * 2) : numPoints));
+          }
+          break;
+      }
+    }
+
+    // Dim the back edges instead of hiding them.
+    function dimBackEdges()
+    {
+      if (stereoMode == STEREO_MODE)
+      {
+        dimOneViewersEdges( [ -0.5 * eyeSeparation, 0.0, VIEWER_Z ] );
+        dimOneViewersEdges( [  0.5 * eyeSeparation, 0.0, VIEWER_Z ] );
+      }
+      else
+      {
+        dimOneViewersEdges( [ 0.0, 0.0, VIEWER_Z ] );
+      }
+    }
+
+    function dimOneViewersEdges(viewerXYZ)
+    {
+      const VminusCtrX = viewerXYZ[0];
+      const VminusCtrY = viewerXYZ[1];
+      const VminusCtrZ = viewerXYZ[2] - cubeCenterZ;
+
+      // Matrix R is orthogonal. Therefore Rinverse = Rtranspose.
+
+      const Rinv_VminusCtr = [
+        R[0] * VminusCtrX + R[1] * VminusCtrY + R[2] * VminusCtrZ,
+        R[3] * VminusCtrX + R[4] * VminusCtrY + R[5] * VminusCtrZ,
+        R[6] * VminusCtrX + R[7] * VminusCtrY + R[8] * VminusCtrZ ];
+
+      // Precalculate Rinv_VminusCorners for all of the cube corners.
+
+      const Rinv_VminusCorners = new Array(numCorners);
+      var i;
+      for (i = 0; i < numCorners; ++i)
+      {
+        const corner = corners[i];
+        Rinv_VminusCorners[i]  = [ Rinv_VminusCtr[0] - cubeRange * corner[0],
+                                   Rinv_VminusCtr[1] - cubeRange * corner[1],
+                                   Rinv_VminusCtr[2] - cubeRange * corner[2] ];
+      }
+
+      // Edge data for the right eye is in the upper half of the array.
+      const edgeDataStart = ((viewerXYZ[0] > 0.0) ? (edgeData.length >> 1) : 0);
+
+      //
+      // Determine which edges are in back of the cube.
+      //
+
+      for (i = 0; i < numEdges; ++i)
+      {
+        // If both parent faces are rotated away from the viewer, dim the edge.
+        //
+        // To avoid rotating corners and face normals for each iteration of
+        // this loop, we instead apply the inverse rotation to the viewer,
+        // which was calculated once before this loop.
+
+        const Rinv_VminusOneCorner = Rinv_VminusCorners[edgeCorners[i][0]];
+
+        const faces = edgeAdjacentFaces[i];
+        const clr =
+          (((dotProduct(Rinv_VminusOneCorner, faceNormals[faces[0]]) < 0.0) &&
+            (dotProduct(Rinv_VminusOneCorner, faceNormals[faces[1]]) < 0.0)    )
+          ? 1   // color = dimmed
+          : 0); // color = not dimmed
+
+        const baseIdx = edgeDataStart + i * EDGE_UINTS;
+        edgeData[baseIdx+3] = (edgeData[baseIdx+3] & ~SCHEME_COLOR_MASK) + clr;
+        edgeData[baseIdx+7] = (edgeData[baseIdx+7] & ~SCHEME_COLOR_MASK) + clr;
+      }
+    }
+
+    function dotProduct(v1, v2)
+    {
+      return (v1[0] * v2[0]) + (v1[1] * v2[1]) + (v1[2] * v2[2]);
+    }
+
+    function setPointsAlongEdge()
+    {
+      const sliderValue = pointsAlongEdgeSlider.value;
+      pointsAlongEdgeText.value = sliderValue;
+
+      if (pointsAlongEdge == sliderValue)
+      {
+        return;
+      }
+      pointsAlongEdge = sliderValue;
+
+      numPoints = pointsAlongEdge * pointsAlongEdge * pointsAlongEdge;
+      pointData = new Uint8Array(numPoints * POINT_UINTS * 2);
+
+      var leftIdx  = 0;
+      var rightIdx = (pointData.length >> 1); // right eye data is in upper half
+
+      var i0, i1, i2;
+      for (i0 = 0; i0 < pointsAlongEdge; ++i0)
+      {
+        for (i1 = 0; i1 < pointsAlongEdge; ++i1)
+        {
+          for (i2 = 0; i2 < pointsAlongEdge; ++i2)
+          {
+            pointData[leftIdx++ ] = pointData[rightIdx++] = i0;
+            pointData[leftIdx++ ] = pointData[rightIdx++] = i1;
+            pointData[leftIdx++ ] = pointData[rightIdx++] = i2;
+            pointData[leftIdx++ ] = 0;
+            pointData[rightIdx++] = RIGHT_EYE_BIT;
+          }
+        }
+      }
+    }
+
+    function setPointSize()
+    {
+      pointSizeText.value = parseFloat(pointSizeSlider.value).toFixed(1);
+    }
+
+    function resetSliders()
+    {
+      pointsAlongEdgeSlider.value = 2;
+      pointSizeSlider.value       = 3.0;
+
+      setPointsAlongEdge();
+      setPointSize();
+
+      draw();
+    }
+
+    // Set the variables that depend on attributes of the display.
+    function getDisplayAttributes()
+    {
+      const newWidth  = gl.drawingBufferWidth;
+      const newHeight = gl.drawingBufferHeight;
+      const newStereoMode =
+        document.querySelector('input[name="stereoModeGroup"]:checked').value;
+
+      if ((newWidth      == canvasWidth ) &&
+          (newHeight     == canvasHeight) &&
+          (newStereoMode == stereoMode  )    )
+      {
+        return;
+      }
+
+      canvasWidth  = newWidth;
+      canvasHeight = newHeight;
+      stereoMode   = newStereoMode;
+
+      const minWidthHeight = ((canvasWidth < canvasHeight) ? canvasWidth
+                                                           : canvasHeight);
+
+      // Divide the display range by the smaller of the two pixel ranges.
+      pixelEdgeLength = 2.0 / minWidthHeight;
+
+      const trueEyeSeparation = 2.0 * (220 / minWidthHeight);
+      // Maybe multiply the eye separation to increase the stereo effect.
+      eyeSeparation = trueEyeSeparation * 1.0;
+
+      switch(stereoMode)
+      {
+        case STEREO_MODE:
+          // Keep the cube small, so that we can place it closer
+          // to the viewer without overlapping the stereo images.
+          cubeRange = 0.1875 * eyeSeparation; // 3/16 * eyeSeparation;
+          cubeCenterZ = 0.0; // on the screen plane
+
+          distanceEyeToCubeCtr = Math.sqrt(
+            (0.5 * eyeSeparation) * (0.5 * eyeSeparation) +
+            (VIEWER_Z - cubeCenterZ) * (VIEWER_Z - cubeCenterZ));
+
+          // To avoid overlapping the 2 images, we'll rotate the left and right
+          // images away from each other slightly, in effect relaxing the eyes.
+          const relaxSin = 2.0 * cubeRange / distanceEyeToCubeCtr;
+          const relaxCos = Math.sqrt(1.0 - relaxSin * relaxSin);
+          uniformStereoParams = [ eyeSeparation, relaxCos, relaxSin ];
+          break;
+
+        case MONO_MODE:
+          cubeRange = 0.1875 * eyeSeparation; // same as stereo; display in mono
+          cubeCenterZ = 0.0;                  // same as stereo; display in mono
+          distanceEyeToCubeCtr = Math.abs(VIEWER_Z - cubeCenterZ);
+          uniformStereoParams = [ 0.0, 1.0, 0.0 ];
+          break;
+
+        case LARGE_MONO_MODE:
+          cubeRange = 0.5; // larger
+          cubeCenterZ = -cubeRange; // Place the cube mostly behind the screen.
+          distanceEyeToCubeCtr = Math.abs(VIEWER_Z - cubeCenterZ);
+          uniformStereoParams = [ 0.0, 1.0, 0.0 ];
+          break;
+
+        default:
+          const errorMsg = "ERROR: Stereo mode is unexpected value '"
+                           + stereoMode + "'";
+          console.log(errorMsg);
+          alert(errorMsg);
+          return;
+      }
+    }
+
+    function clickAutoRotate()
+    {
+      switch(autoRotateButton.innerHTML)
+      {
+        case runAutoRotateText : runAutoRotate() ; break;
+        case stopAutoRotateText: stopAutoRotate(); break;
+        default:
+          const errorMsg = "ERROR: autoRotateButton has unexpected innerHTML '"
+                           + autoRotateButton.innerHTML + "'";
+          console.log(errorMsg);
+          alert(errorMsg);
+          stopAutoRotate();
+          break;
+      }
+    }
+
+    function runAutoRotate()
+    {
+      autoRotateIsRunning = true;
+      autoRotateButton.innerHTML = stopAutoRotateText;
+
+      getDisplayAttributes();
+
+      fpsCount = 0;
+      fpsStartTime = performance.now();
+      window.requestAnimationFrame(loopAutoRotate);
+    }
+
+    function loopAutoRotate(timestamp)
+    {
+      if (autoRotateIsRunning)
+      {
+        rotate([-0.375 * pixelEdgeLength, 0.1875 * pixelEdgeLength, cubeRange],
+               [ 0.375 * pixelEdgeLength,-0.1875 * pixelEdgeLength, cubeRange]);
+        draw();
+
+        ++fpsCount;
+        const newTime = performance.now();
+        if (newTime - fpsStartTime >= 1000.0)
+        {
+          const rateValue = 1000.0 * fpsCount / (newTime - fpsStartTime);
+          fpsText.value = "FPS = " + rateValue.toFixed(1);
+          fpsCount = 0;
+          fpsStartTime = performance.now();
+        }
+
+        window.requestAnimationFrame(loopAutoRotate);
+      }
+    }
+
+    function stopAutoRotate()
+    {
+      autoRotateIsRunning = false;
+      autoRotateButton.innerHTML = runAutoRotateText;
+    }
+
+    function mouseDownEvent(event)
+    {
+      mouseIsDown = true;
+      prevMouseX  = event.clientX;
+      prevMouseY  = event.clientY;
+      stopAutoRotate();
+    }
+
+    function mouseUpEvent(event)
+    {
+      mouseIsDown = false;
+    }
+
+    function mouseMoveEvent(event)
+    {
+      if (!mouseIsDown)
+      {
+        return;
+      }
+
+      const newX = event.clientX;
+      const newY = event.clientY;
+
+      if ((newX == prevMouseX) && (newY == prevMouseY))
+      {
+        return;
+      }
+
+      getDisplayAttributes();
+
+      // Convert the mouse movement into "from" and "to" vectors for a rotation.
+
+      // Note: Mouse Y coord goes downward, but vertex Y coord goes upward.
+      const deltaX =  (newX - prevMouseX) * pixelEdgeLength;
+      const deltaY = -(newY - prevMouseY) * pixelEdgeLength;
+
+      // The sphere around the cube has this radius:
+      const radius = SQRT_3 * cubeRange;
+
+      rotate( [ -0.5 * deltaX, -0.5 * deltaY, radius ],
+              [  0.5 * deltaX,  0.5 * deltaY, radius ] );
+      draw();
+
+      prevMouseX = newX;
+      prevMouseY = newY;
+    }
+  </script>
+
+  <script type="glsl" id="vertexShaderCode">#version 300 es
+    precision highp float;
+
+    uniform  float viewerZ;
+    uniform  float cubeCenterZ;
+    uniform  vec2  aspectAdjust;
+    uniform  mat3  colorScheme;
+    uniform  float pointSize;
+
+    uniform  vec3  stereoParams;
+    // stereoParams[0] = eye separation, or 0.0 if mono
+    // stereoParams[1] = cos of slight rotation left or right, or 1.0 if mono
+    // stereoParams[2] = sin of slight rotation left or right, or 0.0 if mono
+
+    uniform  mat3  R;
+    uniform  vec2  startAndDelta;
+
+    in       uvec4 position;
+
+    flat out vec4  theColor;
+
+    void main()
+    {
+      // position.xyx = integer position of the unrotated point along X,Y,Z.
+      //
+      // We use startAndDelta[0] and startAndDelta[1] to convert integer
+      // position.xyz to scaled float positions.  Then we apply rotation R.
+
+      vec3 worldPoint =
+        R * (startAndDelta[0] + startAndDelta[1] * vec3(position));
+
+      // Translate to the cube center.
+      worldPoint.z += cubeCenterZ;
+
+      // position.w holds two values:
+      // Bits 0-3 are an index into the color scheme.
+      // Bit 4 is on if the point is being viewed from the right eye.
+
+      theColor = vec4(colorScheme[position.w & 0xfu], 1.0);
+
+      // For the left  eye, minusOrPlusOne = -1.0
+      // For the right eye, minusOrPlusOne =  1.0
+      float minusOrPlusOne = float((position.w & 0x10u) >> 3) - 1.0;
+
+      vec3 viewer = vec3(0.5 * stereoParams[0] * minusOrPlusOne, 0.0, viewerZ);
+
+      // To avoid overlapping the images on the screen, we rotate the world
+      // leftward or rightward slightly, effectively relaxing the eyes a little.
+
+      float relaxCos = stereoParams[1];
+      float relaxSin = stereoParams[2] * minusOrPlusOne;
+      worldPoint.xz = (mat2(relaxCos, relaxSin, -relaxSin, relaxCos)
+                       * (worldPoint.xz - viewer.xz))
+                      + viewer.xz;
+
+      vec2 displayPoint = (viewerZ * worldPoint.xy - worldPoint.z * viewer.xy)
+                          / (viewerZ - worldPoint.z);
+
+      gl_Position = vec4(displayPoint / aspectAdjust,
+                         // Negate Z to convert from world Z to opengl Z.
+                         // Also, compress Z to stay within the clip planes.
+                         -0.01 * worldPoint.z,
+                         1.0);
+
+      gl_PointSize = pointSize;
+    }
+  </script>
+
+  <script type="glsl" id="fragmentShaderCode">#version 300 es
+    precision highp float;
+
+    flat in vec4  theColor;
+    out     vec4  outputColor;
+
+    void main()
+    {
+      outputColor = theColor;
+    }
+  </script>
+</html>

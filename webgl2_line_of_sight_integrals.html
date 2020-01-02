@@ -1,0 +1,1693 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta http-equiv="content-type" content="text/html; charset=UTF-8" />
+    <meta name="author" content="Mike McKenna">
+    <title>Line-of-Sight Integrals through a 3D Texture</title>
+
+    <style>
+      body {
+        text-align: center;
+
+        /* Turn off highlighting during mouse drag */
+        -khtml-user-select: none;
+        -moz-user-select: none;
+        -ms-user-select: none;
+        -webkit-touch-callout: none;
+        -webkit-user-select: none;
+        user-select: none;
+      }
+      table {
+        border-collapse: collapse;
+        margin: auto;
+        text-align: left;
+      }
+      tr {
+        border-width: thin;
+        border-color: black;
+      }
+      td {
+        border-width: thin;
+        border-color: black;
+      }
+      button {
+        margin-top: 3px;
+        width: 120px;
+        margin-right: 18px;
+        margin-bottom: 3px;
+      }
+      .solid-top {
+        border-top-style: solid;
+      }
+      .solid-right {
+        border-right-style: solid;
+        padding-right: 8px;
+      }
+      .solid-bottom {
+        border-bottom-style: solid;
+      }
+      .solid-left {
+        border-left-style: solid;
+        padding-left: 8px;
+      }
+      .invisible-left {
+        padding-left: 8px;
+      }
+      .spacer {
+        /* Add height, with solid-left and solid-right */
+        height: 2px;
+        border-right-style: solid;
+        border-left-style: solid;
+        padding-right: 8px;
+        padding-left: 8px;
+      }
+      .slider-input {
+        width: 120px;
+      }
+      .slider-text {
+        min-width: 48px;
+      }
+    </style>
+  </head>
+
+  <body onload="startGraphics()">
+    <h2>Line-of-Sight Integrals through a 3D Texture</h2>
+
+    <!-- Use tables to better align html elements. Consider using more CSS. -->
+    <table>
+      <tr>
+        <td>Click on the image and drag.</td>
+      </tr>
+      <tr>
+        <td><canvas id="theCanvas" width="480" height="320"></canvas></td>
+      </tr>
+    </table>
+    <table>
+      <tr class="solid-top">
+        <td colspan="6" class="spacer"></td>
+      </tr>
+      <tr>
+        <td class="solid-left">Freq</td>
+        <td><input id="frequencySlider" type="range" class="slider-input"
+             min="1" max="15" value="8" step="1"
+             oninput="setFreqSliderText(value); draw()">
+        </td>
+        <td class="slider-text">
+            <output id="frequencyText">8</output>
+        </td>
+        <td colspan="3" class="invisible-left solid-right">
+          <table style="margin-left: 0px">
+            <tr>
+              <td>Edges</td>
+              <td><input id="edgesSlider" type="range" class="slider-input"
+                   min="0.0" max="1.0" value="0.0" step="0.0001"
+                   oninput="setEdgesSliderText(value); draw()">
+              </td>
+              <td class="slider-text">
+                  <output id="edgesText">0.0000</output>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+      <tr class="solid-bottom">
+        <td colspan="6" class="spacer"></td>
+      </tr>
+      <tr class="solid-top">
+        <td colspan="3" class="spacer"></td>
+        <td colspan="3" class="spacer"></td>
+      </tr>
+      <tr>
+        <td class="solid-left">Red</td>
+        <td><input id="redMultiplierSlider" type="range" class="slider-input"
+             min="0.0" max="2.0" value="1.0" step="0.0001"
+             oninput="setRedSliderText(value); draw()">
+        </td>
+        <td class="slider-text solid-right">
+            <output id="redMultiplierText">1.0000</output>
+        </td>
+        <td class="solid-left">
+            <button onclick="resetSliders(); draw()">Reset Sliders</button>
+        </td>
+        <td><input type="radio" name="stereoModeGroup" onclick="draw()" checked
+             value="stereo">
+        </td>
+        <td class="solid-right">Stereo</td>
+      </tr>
+      <tr>
+        <td class="solid-left">Green</td>
+        <td><input id="greenMultiplierSlider" type="range" class="slider-input"
+             min="0.0" max="2.0" value="1.0" step="0.0001"
+             oninput="setGreenSliderText(value); draw()">
+        </td>
+        <td class="slider-text">
+            <output id="greenMultiplierText">1.0000</output>
+        </td>
+        <td class="solid-left">
+            <button onclick="slidersPreset1();draw()">Sliders Preset 1</button>
+        </td>
+        <td><input type="radio" name="stereoModeGroup" onclick="draw()"
+             value="mono">
+        </td>
+        <td class="solid-right">Mono</td>
+      </tr>
+      <tr>
+        <td class="solid-left">Blue</td>
+        <td><input id="blueMultiplierSlider" type="range" class="slider-input"
+             min="0.0" max="2.0" value="1.0" step="0.0001"
+             oninput="setBlueSliderText(value); draw()">
+        </td>
+        <td class="slider-text">
+          <output id="blueMultiplierText">1.0000</output>
+        </td>
+        <td class="solid-left">
+            <button onclick="slidersPreset2();draw()">Sliders Preset 2</button>
+        </td>
+        <td><input type="radio" name="stereoModeGroup" onclick="draw()"
+             value="largeMono">
+        </td>
+        <td class="solid-right">Large Mono</td>
+      </tr>
+      <tr>
+        <td colspan="3" class="solid-left">(Colors &gt; 1.0 may saturate.)
+        </td>
+        <td class="solid-left">
+            <button id="autoRotateButton" onclick="clickAutoRotate()"
+                    >Run Auto Rotate</button>
+        </td>
+        <td colspan="2" class="solid-right">
+          <output id="fpsText" style="margin-left: 4px"></output>
+        </td>
+      </tr>
+      <tr class="solid-bottom">
+        <td colspan="3" class="spacer"></td>
+        <td colspan="3" class="spacer"></td>
+      </tr>
+    </table>
+
+    <div style="line-height: 6px">&nbsp;</div>
+
+    <table>
+      <tr style="vertical-align: top">
+        <td>WebGL renderer:</td>
+        <td><output id="webglRenderer">unknown</output></td>
+      </tr>
+      <tr style="vertical-align: top">
+        <td>WebGL vendor:</td>
+        <td><output id="webglVendor"  >unknown</output></td>
+      </tr>
+      <tr><td>&nbsp;</td></tr>
+      <tr>
+        <td colspan="2">Other exercises are <a href="index.html">here</a>.</td>
+      </tr>
+    </table>
+  </body>
+
+  <script>
+    "use strict"
+
+    // The javascript here forgoes three.js to more closely play with WebGL.
+    //
+    // Define the corners of a generic cube, plus triangles over the surface of
+    // that cube.  Before rotations, the cube corners are at these positions:
+    //
+    //  6-------7
+    //  |\     /|
+    //  | 2---3 |
+    //  | |   | |
+    //  | 0---1 |
+    //  |/     \|
+    //  4-------5
+    //
+    //
+    //  Y coordinate is upward.
+    //  |
+    //  |  Z coordinate is frontward, toward you.
+    //  | /
+    //  |/
+    //  '---X coordinate is rightward.
+
+    // Implicit in our calculations, the six faces of a generic cube are:
+    //
+    //   the left  face: orthogonal dim = 0; position along dim 0 is -1
+    //   the right face: orthogonal dim = 0; position along dim 0 is  1
+    //
+    //   the down  face: orthogonal dim = 1; position along dim 1 is -1
+    //   the up    face: orthogonal dim = 1; position along dim 1 is  1
+    //
+    //   the back  face: orthogonal dim = 2; position along dim 2 is -1
+    //   the front face: orthogonal dim = 2; position along dim 2 is  1
+
+    // For the two triangle on each cube face, define indices to cube corners:
+    //
+    const triangleCorners = [
+      0, 4, 6,  6, 2, 0,  // left  face
+      1, 3, 7,  7, 5, 1,  // right face
+
+      0, 1, 5,  5, 4, 0,  // down  face
+      2, 6, 7,  7, 3, 2,  // up    face
+
+      0, 2, 3,  3, 1, 0,  // back  face
+      4, 5, 7,  7, 6, 4   // front face
+    ];
+
+    // For each edge, define the corners at the two ends:
+    const edgeCorners = [
+      0, 1,
+      2, 3,
+      4, 5,
+      6, 7,
+
+      0, 2,
+      1, 3,
+      4, 6,
+      5, 7,
+
+      0, 4,
+      1, 5,
+      2, 6,
+      3, 7
+    ];
+
+    const CUBE_FACES =  6;
+    const CUBE_EDGES = 12;
+
+    // (2 triangles per face) times (3 corners per triangle) =
+    const T_CORNERS_PER_FACE = 6;
+
+    const VIEWER_Z = 8.0;
+    const SQRT_3   = Math.sqrt(3.0);
+    const TWO_PI   = 2.0 * Math.PI;
+
+    const STEREO_MODE     = "stereo";
+    const MONO_MODE       = "mono";
+    const LARGE_MONO_MODE = "largeMono";
+    const RIGHT_EYE_BIT   = 8; // a flag bit that indicates right eye data
+
+    // We send one integer per corner to GLSL:
+    const CORNER_UINTS = 1;
+
+    const clearAllUints = new Uint8Array([0, 1, 3,  3, 2, 0]); // 2 triangles
+
+    // The vertex data that we send to GLSL for the back faces will consist of
+    //   data for each back face,
+    //     which consists of data for each corner of the face's two triangles,
+    //       which consists of CORNER_UINTS integers for each corner,
+    //         times 2 when in stereo mode.
+    //
+    const  backFaceUints = new Uint8Array(CUBE_FACES * T_CORNERS_PER_FACE *
+                                          CORNER_UINTS * 2);
+    var    numBackFaceUints;
+
+    // The vertex data that we send to GLSL for the edges will consist of
+    //   the data for each edge,
+    //     which consists of data for the edge's two ends,
+    //       which consists of CORNER_UINTS integers for each end,
+    //         times 2 when in stereo mode.
+    //
+    const  edgeUints = new Uint8Array(CUBE_EDGES * 2 * CORNER_UINTS * 2);
+    var    numEdgeUints;
+
+    // Accumulated rotation:
+    const  R = [1.0, 0.0, 0.0,  0.0, 1.0, 0.0,  0.0, 0.0, 1.0]; // column-major
+
+    // variables around the html elements
+    //
+    var   frequencySlider;
+    var   frequencyText;
+    var   edgesSlider;
+    var   edgesText;
+    var   redMultiplierSlider;
+    var   redMultiplierText;
+    var   greenMultiplierSlider;
+    var   greenMultiplierText;
+    var   blueMultiplierSlider;
+    var   blueMultiplierText;
+    var   drawEdgesCheckbox;
+    var   autoRotateButton;
+    const RUN_AUTO_ROTATE  = "Run Auto Rotate";
+    const STOP_AUTO_ROTATE = "Stop Auto Rotate";
+    var   autoRotateIsRunning = false;
+    var   fpsText;
+    var   fpsCount;
+    var   fpsStartTime;
+
+    // webgl2 context:
+    var   gl;
+
+    // the clear-all shader program:
+    const cap = {};
+
+    // the main shader program:
+    const mp = {};
+
+    // the uniform-color shader program:
+    const ucp = {};
+
+    // the read-texture shader program:
+    const rtp = {};
+
+    // webgl texture:
+    var   textureFramebuffer;
+    var   textureWidth  = -1;
+    var   textureHeight = -1;
+    var   accumulatorTexture;
+
+    // Variables for stereo mode:
+    var   canvasWidth  = -1;
+    var   canvasHeight = -1;
+    var   stereoMode   = "";
+    var   pixelEdgeLength;
+    var   cubeRange; // unrotated cube spans [-cubeRange,cubeRange] along x,y,z
+
+    //
+    // To avoid overlapping cubes in the stereo image, we will rotate the left
+    // eye's world slightly leftward, and the right eye's world slightly
+    // rightward, in effect relaxing the eyes a little.
+    //
+    var   viewerLeft;
+    var   viewerRight;
+    var   relaxLeft;
+    var   relaxRight;
+    var   cubeCenterLeft;
+    var   cubeCenterRight;
+    const frontFacesLeft  = [0, 0, 0];
+    const frontFacesRight = [0, 0, 0];
+    const RLeft  = [1.0, 0.0, 0.0,  0.0, 1.0, 0.0,  0.0, 0.0, 1.0];
+    const RRight = [1.0, 0.0, 0.0,  0.0, 1.0, 0.0,  0.0, 0.0, 1.0];
+
+    // Variables for mouse actions:
+
+    var   mouseIsDown = false;
+    var   prevMouseX;
+    var   prevMouseY;
+
+    //
+    // Main function.
+    //
+
+    function startGraphics()
+    {
+      //
+      // Initialize.
+      //
+
+      gl = document.getElementById("theCanvas").getContext("webgl2");
+      if (!gl)
+      {
+        const errorMsg =
+                "ERROR: This browser does not offer a webgl2 context.";
+        console.log(errorMsg);
+        alert(errorMsg);
+        return;
+      }
+
+      gl.clearColor(0.0, 0.0, 0.0, 1.0); // r,g,b,opaque
+
+      // Get the renderer and vendor debug info.
+      const rendererInfo = gl.getExtension("WEBGL_debug_renderer_info");
+      if (rendererInfo)
+      {
+        document.getElementById("webglRenderer").value =
+          gl.getParameter(rendererInfo.UNMASKED_RENDERER_WEBGL);
+        document.getElementById("webglVendor").value =
+          gl.getParameter(rendererInfo.UNMASKED_VENDOR_WEBGL);
+      }
+
+      // Get an extension that supports texture format RGBA32F.
+      // This extension should allow additive blending into 32-bit floats.
+      //
+      const RGBA32Fextension = "EXT_color_buffer_float";
+      if (! gl.getSupportedExtensions().includes(RGBA32Fextension))
+      {
+        const errorMsg = "ERROR: This browser does not offer extension '" +
+                RGBA32Fextension + "' for adding into a float texture.";
+        console.log(errorMsg);
+        alert(errorMsg);
+        return;
+      }
+
+      gl.getExtension(RGBA32Fextension);
+      textureFramebuffer = gl.createFramebuffer();
+
+      // Get some of the html items.
+      //
+      frequencySlider       = document.getElementById("frequencySlider");
+      frequencyText         = document.getElementById("frequencyText");
+      edgesSlider           = document.getElementById("edgesSlider");
+      edgesText             = document.getElementById("edgesText");
+      redMultiplierSlider   = document.getElementById("redMultiplierSlider");
+      redMultiplierText     = document.getElementById("redMultiplierText");
+      greenMultiplierSlider = document.getElementById("greenMultiplierSlider");
+      greenMultiplierText   = document.getElementById("greenMultiplierText");
+      blueMultiplierSlider  = document.getElementById("blueMultiplierSlider");
+      blueMultiplierText    = document.getElementById("blueMultiplierText");
+      drawEdgesCheckbox     = document.getElementById("drawEdgesCheckbox");
+      autoRotateButton      = document.getElementById("autoRotateButton");
+      fpsText               = document.getElementById("fpsText");
+
+      //
+      // Compile and link the shaders into shader programs.
+      //
+
+      const cornerVShader = compileShader("cornerVShader" ,gl.VERTEX_SHADER);
+      const canvasVShader = compileShader("canvasVShader" ,gl.VERTEX_SHADER);
+      const mainFShader   = compileShader("mainFShader"   ,gl.FRAGMENT_SHADER);
+      const uniformFShader= compileShader("uniformFShader",gl.FRAGMENT_SHADER);
+      const readTexFShader= compileShader("readTexFShader",gl.FRAGMENT_SHADER);
+
+      if (!cornerVShader  ||
+          !canvasVShader  ||
+          !mainFShader    ||
+          !uniformFShader ||
+          !readTexFShader    )
+      {
+        return;
+      }
+
+      cap.program = gl.createProgram();
+      gl.attachShader(cap.program, canvasVShader);
+      gl.attachShader(cap.program, uniformFShader);
+      gl.linkProgram(cap.program);
+      prepareClearAllProgram();
+
+      mp.program = gl.createProgram();
+      gl.attachShader(mp.program, cornerVShader);
+      gl.attachShader(mp.program, mainFShader);
+      gl.linkProgram(mp.program);
+      prepareMainProgram();
+
+      ucp.program = gl.createProgram();
+      gl.attachShader(ucp.program, cornerVShader);
+      gl.attachShader(ucp.program, uniformFShader);
+      gl.linkProgram(ucp.program);
+      prepareUniformColorProgram();
+
+      rtp.program = gl.createProgram();
+      gl.attachShader(rtp.program, cornerVShader);
+      gl.attachShader(rtp.program, readTexFShader);
+      gl.linkProgram(rtp.program);
+      prepareReadTextureProgram();
+
+      //
+      // Define functions that will respond to mouse actions and redraw.
+      //
+
+      gl.canvas.onmousedown = mouseDownEvent;
+      document.onmouseup    = mouseUpEvent;
+      document.onmousemove  = mouseMoveEvent;
+
+      //
+      // Draw the first image.
+      //
+
+      slidersPreset2();
+      rotate( [ 0, 0, 1 ], [ 0.33, -0.33, 1 ] );
+      draw();
+    }
+
+    function compileShader(shaderName, shaderType)
+    {
+      const shader = gl.createShader(shaderType);
+      gl.shaderSource(shader, document.getElementById(shaderName).innerHTML);
+      gl.compileShader(shader);
+      if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS))
+      {
+        alert("ERROR: Failed to compile the shader named \"" +
+              shaderName + "\": " + gl.getShaderInfoLog(shader));
+        return null;
+      }
+
+      return shader;
+    }
+
+    function prepareClearAllProgram()
+    {
+      const p = cap.program;
+      gl.useProgram(p);
+
+      cap.uniformColorLoc = gl.getUniformLocation(p, "uniformColor");
+
+      cap.vertexArray = gl.createVertexArray();
+      cap.glBuffer    = gl.createBuffer();
+      gl.bindVertexArray(cap.vertexArray);
+      gl.bindBuffer(gl.ARRAY_BUFFER, cap.glBuffer);
+
+      const cornerInfoLoc = gl.getAttribLocation(p, "cornerInfo");
+      gl.enableVertexAttribArray(cornerInfoLoc);
+      gl.vertexAttribIPointer(cornerInfoLoc, 1, gl.UNSIGNED_BYTE,
+                              CORNER_UINTS, 0);
+      gl.bindVertexArray(null);
+
+      gl.uniform4f(cap.uniformColorLoc, 0.0, 0.0, 0.0, 1.0);
+    }
+
+    function prepareMainProgram()
+    {
+      const p = mp.program;
+      gl.useProgram(p);
+
+      mp.cubeRangeLoc        = gl.getUniformLocation(p, "cubeRange");
+      mp.aspectAdjustLoc     = gl.getUniformLocation(p, "aspectAdjust");
+      mp.minStableTLoc       = gl.getUniformLocation(p, "minStableT");
+      mp.maxStableTLoc       = gl.getUniformLocation(p, "maxStableT");
+      mp.pixelEdgeLenLoc     = gl.getUniformLocation(p, "pixelEdgeLen");
+      mp.twoPIxFreqLoc       = gl.getUniformLocation(p, "twoPIxFreq");
+      mp.colorMultipliersLoc = gl.getUniformLocation(p, "colorMultipliers");
+      mp.viewerLeftLoc       = gl.getUniformLocation(p, "viewerLeft");
+      mp.viewerRightLoc      = gl.getUniformLocation(p, "viewerRight");
+      mp.cubeCenterLeftLoc   = gl.getUniformLocation(p, "cubeCenterLeft");
+      mp.cubeCenterRightLoc  = gl.getUniformLocation(p, "cubeCenterRight");
+      mp.frontFacesLeftLoc   = gl.getUniformLocation(p, "frontFacesLeft");
+      mp.frontFacesRightLoc  = gl.getUniformLocation(p, "frontFacesRight");
+      mp.RLeftLoc            = gl.getUniformLocation(p, "RLeft");
+      mp.RRightLoc           = gl.getUniformLocation(p, "RRight");
+
+      mp.vertexArray = gl.createVertexArray();
+      mp.glBuffer    = gl.createBuffer();
+      gl.bindVertexArray(mp.vertexArray);
+      gl.bindBuffer(gl.ARRAY_BUFFER, mp.glBuffer);
+
+      const cornerInfoLoc = gl.getAttribLocation(p, "cornerInfo");
+      gl.enableVertexAttribArray(cornerInfoLoc);
+      gl.vertexAttribIPointer(cornerInfoLoc, 1, gl.UNSIGNED_BYTE,
+                              CORNER_UINTS, 0);
+      gl.bindVertexArray(null);
+    }
+
+    function prepareUniformColorProgram()
+    {
+      const p = ucp.program;
+      gl.useProgram(p);
+
+      ucp.cubeRangeLoc       = gl.getUniformLocation(p, "cubeRange");
+      ucp.aspectAdjustLoc    = gl.getUniformLocation(p, "aspectAdjust");
+      ucp.viewerLeftLoc      = gl.getUniformLocation(p, "viewerLeft");
+      ucp.viewerRightLoc     = gl.getUniformLocation(p, "viewerRight");
+      ucp.cubeCenterLeftLoc  = gl.getUniformLocation(p, "cubeCenterLeft");
+      ucp.cubeCenterRightLoc = gl.getUniformLocation(p, "cubeCenterRight");
+      ucp.RLeftLoc           = gl.getUniformLocation(p, "RLeft");
+      ucp.RRightLoc          = gl.getUniformLocation(p, "RRight");
+      ucp.uniformColorLoc    = gl.getUniformLocation(p, "uniformColor");
+
+      ucp.vertexArray = gl.createVertexArray();
+      ucp.glBuffer    = gl.createBuffer();
+      gl.bindVertexArray(ucp.vertexArray);
+      gl.bindBuffer(gl.ARRAY_BUFFER, ucp.glBuffer);
+
+      const cornerInfoLoc = gl.getAttribLocation(p, "cornerInfo");
+      gl.enableVertexAttribArray(cornerInfoLoc);
+      gl.vertexAttribIPointer(cornerInfoLoc, 1, gl.UNSIGNED_BYTE,
+                              CORNER_UINTS, 0);
+      gl.bindVertexArray(null);
+
+      // Set up the edgeUints array, which will always have the same content.
+      //
+      numEdgeUints = 0;
+      var edgeIdx;
+      for (edgeIdx = 0; edgeIdx < edgeCorners.length; ++edgeIdx)
+      {
+        edgeUints[numEdgeUints++] = edgeCorners[edgeIdx];
+      }
+      for (edgeIdx = 0; edgeIdx < edgeCorners.length; ++edgeIdx)
+      {
+        edgeUints[numEdgeUints++] = edgeCorners[edgeIdx] | RIGHT_EYE_BIT;
+      }
+    }
+
+    function prepareReadTextureProgram()
+    {
+      const p = rtp.program;
+      gl.useProgram(p);
+
+      rtp.cubeRangeLoc       = gl.getUniformLocation(p, "cubeRange");
+      rtp.aspectAdjustLoc    = gl.getUniformLocation(p, "aspectAdjust");
+      rtp.viewerLeftLoc      = gl.getUniformLocation(p, "viewerLeft");
+      rtp.viewerRightLoc     = gl.getUniformLocation(p, "viewerRight");
+      rtp.cubeCenterLeftLoc  = gl.getUniformLocation(p, "cubeCenterLeft");
+      rtp.cubeCenterRightLoc = gl.getUniformLocation(p, "cubeCenterRight");
+      rtp.RLeftLoc           = gl.getUniformLocation(p, "RLeft");
+      rtp.RRightLoc          = gl.getUniformLocation(p, "RRight");
+      rtp.samplerLoc         = gl.getUniformLocation(p, "sampler");
+
+      rtp.vertexArray = gl.createVertexArray();
+      rtp.glBuffer    = gl.createBuffer();
+      gl.bindVertexArray(rtp.vertexArray);
+      gl.bindBuffer(gl.ARRAY_BUFFER, rtp.glBuffer);
+
+      const cornerInfoLoc = gl.getAttribLocation(p, "cornerInfo");
+      gl.enableVertexAttribArray(cornerInfoLoc);
+      gl.vertexAttribIPointer(cornerInfoLoc, 1, gl.UNSIGNED_BYTE,
+                              CORNER_UINTS, 0);
+      gl.bindVertexArray(null);
+
+      gl.uniform1i(rtp.samplerLoc, 0);
+    }
+
+    function rotate(fromV, toV)
+    {
+      // Convert vector pivot (fromV, toV) to matrix deltaR.
+
+      const cosTheta =
+        dotProduct(fromV, toV) /
+        Math.sqrt(dotProduct(fromV, fromV) * dotProduct(toV, toV));
+      const kos = 1 - cosTheta;
+
+      const temp = 1 - cosTheta * cosTheta;
+      const sinTheta = ((temp > 0.0) ? Math.sqrt(temp) : 0.0);
+
+      const axis = [(fromV[1] * toV[2]) - (fromV[2] * toV[1]),
+                    (fromV[2] * toV[0]) - (fromV[0] * toV[2]),
+                    (fromV[0] * toV[1]) - (fromV[1] * toV[0])];
+      const axisLen = Math.sqrt(dotProduct(axis, axis));
+      axis[0] /= axisLen;
+      axis[1] /= axisLen;
+      axis[2] /= axisLen;
+
+      // Define matrix deltaR in column-major order in case we send it to GLSL.
+      const deltaR = [
+        kos * axis[0] * axis[0] + cosTheta,
+        kos * axis[0] * axis[1] + sinTheta * axis[2],
+        kos * axis[0] * axis[2] - sinTheta * axis[1],
+
+        kos * axis[0] * axis[1] - sinTheta * axis[2],
+        kos * axis[1] * axis[1] + cosTheta,
+        kos * axis[1] * axis[2] + sinTheta * axis[0],
+
+        kos * axis[0] * axis[2] + sinTheta * axis[1],
+        kos * axis[1] * axis[2] - sinTheta * axis[0],
+        kos * axis[2] * axis[2] + cosTheta
+      ];
+
+      // Apply matrix deltaR to accumulated rotation matrix R:
+      multMxM(deltaR, R, R);
+    }
+
+    function draw()
+    {
+      setupDisplayAttributes();
+
+      //-----------------------------------------------------------------------
+      //
+      //  Set up the main program's volatile uniform variables.
+
+      gl.useProgram(mp.program);
+
+      numBackFaceUints = 0;
+
+      if (stereoMode == STEREO_MODE)
+      {
+        multMxM(relaxLeft , R, RLeft);
+        multMxM(relaxRight, R, RRight);
+
+        // Determine the front and back faces of the cube for each eye.
+        getViewerFaces(viewerLeft , cubeCenterLeft , RLeft , frontFacesLeft);
+        getViewerFaces(viewerRight, cubeCenterRight, RRight, frontFacesRight);
+
+        gl.uniform3uiv(mp.frontFacesLeftLoc , frontFacesLeft);
+        gl.uniform3uiv(mp.frontFacesRightLoc, frontFacesRight);
+      }
+      else
+      {
+        // Determine the front and back faces of the cube.
+        getViewerFaces(viewerLeft, cubeCenterLeft, R, frontFacesLeft);
+
+        gl.uniform3uiv(mp.frontFacesLeftLoc, frontFacesLeft);
+      }
+
+      gl.uniform1f(mp.twoPIxFreqLoc, TWO_PI * frequencyText.value
+                                     / (2.0 * cubeRange));
+      gl.uniform3f(mp.colorMultipliersLoc, redMultiplierSlider.value,
+                                           greenMultiplierSlider.value,
+                                           blueMultiplierSlider.value);
+      setupRUniforms(mp);
+
+      //-----------------------------------------------------------------------
+      //
+      // Set up the other shader programs' volatile uniforms:
+
+      gl.useProgram(ucp.program);
+      setupRUniforms(ucp);
+
+      gl.useProgram(rtp.program);
+      setupRUniforms(rtp);
+
+      //-----------------------------------------------------------------------
+      //
+      // Write the cube interior image to the texture store.
+
+      gl.disable(gl.BLEND);
+      gl.activeTexture(gl.TEXTURE0);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, textureFramebuffer);
+      if (!setupTextureStore())
+      {
+        return;
+      }
+
+      gl.useProgram(mp.program);
+      doDrawArrays(mp, backFaceUints, numBackFaceUints, gl.TRIANGLES);
+
+      //-----------------------------------------------------------------------
+      //
+      // Add the cube edges to the texture store. Use additive blending.
+
+      const e = edgesSlider.value;
+      if (e > 0.0)
+      {
+        gl.enable(gl.BLEND);
+        gl.blendFuncSeparate(gl.ONE, gl.ONE, gl.ONE, gl.ZERO);
+
+        gl.useProgram(ucp.program);
+
+        gl.uniform1f(ucp.cubeRangeLoc, cubeRange);
+        gl.uniform4f(ucp.uniformColorLoc, e, e, e, 1.0);
+
+        const numUints =
+          ((stereoMode == STEREO_MODE) ? numEdgeUints : (numEdgeUints / 2));
+
+        doDrawArrays(ucp, edgeUints, numUints, gl.LINES);
+        gl.disable(gl.BLEND);
+      }
+
+      //-----------------------------------------------------------------------
+      //
+      // Read the texture to the canvas.
+
+      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+
+      gl.useProgram(rtp.program);
+      gl.clear(gl.COLOR_BUFFER_BIT);
+      doDrawArrays(rtp, backFaceUints, numBackFaceUints, gl.TRIANGLES);
+
+      //-----------------------------------------------------------------------
+      //
+      // Finally, clear the parts of the texture that we wrote to.
+
+      gl.bindFramebuffer(gl.FRAMEBUFFER, textureFramebuffer);
+
+      gl.useProgram(ucp.program);
+
+      gl.uniform1f(ucp.cubeRangeLoc   , cubeRange * 1.05);
+      gl.uniform4f(ucp.uniformColorLoc, 0.0, 0.0, 0.0, 1.0);
+
+      doDrawArrays(ucp, backFaceUints, numBackFaceUints, gl.TRIANGLES);
+
+      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    }
+
+    function setupRUniforms(p)
+    {
+      if (stereoMode == STEREO_MODE)
+      {
+        gl.uniformMatrix3fv(p.RLeftLoc , false, RLeft);
+        gl.uniformMatrix3fv(p.RRightLoc, false, RRight);
+      }
+      else
+      {
+        gl.uniformMatrix3fv(p.RLeftLoc, false, R);
+      }
+    }
+
+    function doDrawArrays(p, uintsArray, numUints, drawMode)
+    {
+      gl.bindVertexArray(p.vertexArray);
+      gl.bindBuffer(gl.ARRAY_BUFFER, p.glBuffer);
+      gl.bufferData(gl.ARRAY_BUFFER, uintsArray, gl.DYNAMIC_DRAW, 0,
+                    uintsArray.BYTES_PER_ELEMENT * numUints);
+      gl.drawArrays(drawMode, 0, numUints / CORNER_UINTS);
+      gl.bindVertexArray(null);
+    }
+
+    function getViewerFaces(viewer, cubeCenter, vR, frontFaces)
+    {
+      const rightEyeFlag = ((viewer[0] > 0.0) ? RIGHT_EYE_BIT : 0);
+
+      const CtrMinusVx = cubeCenter[0] - viewer[0];
+      const CtrMinusVy = cubeCenter[1] - viewer[1];
+      const CtrMinusVz = cubeCenter[2] - viewer[2];
+
+      // Matrix vR is orthogonal. Therefore vRinverse == vRtranspose:
+      const vRinv_CtrMinusV = [
+        vR[0] * CtrMinusVx + vR[1] * CtrMinusVy + vR[2] * CtrMinusVz,
+        vR[3] * CtrMinusVx + vR[4] * CtrMinusVy + vR[5] * CtrMinusVz,
+        vR[6] * CtrMinusVx + vR[7] * CtrMinusVy + vR[8] * CtrMinusVz ];
+
+      // Determine the cube's front and back faces for this viewer.
+      var numFrontFaces = 0;
+      var faceIdx;
+      for (faceIdx = 0; faceIdx < CUBE_FACES; ++faceIdx)
+      {
+        // The face is a front face if and only if
+        //
+        //  dot((vR * (sign*N)),
+        //      (vR * (cubeRange*corner) + cubeCenter - viewer)) < 0.
+        //
+        //  where sign = 1.0 if the face's outward normal is positive, or
+        //              -1.0 if the face's outward normal is negative.
+        //  and N is the face normal pointed in the positive direction.
+        //
+        // Multiplying the dot product's two vectors by vRinverse, we get:
+        //
+        //  dot((sign*N),
+        //      (cubeRange*corner + vRinv*(cubeCenter-viewer))) < 0
+        //
+        // or
+        //  sign*(vRinv_CtrMinusV[orthogDim] + cubeRange*corner[orthogDim]) < 0
+        //
+        // or
+        //  sign*(vRinv_CtrMinusV[orthogDim] + cubeRange*sign) < 0
+
+        const orthogDim = faceIdx >> 1;
+        const sign = ((faceIdx & 1) ? 1.0 : -1.0);
+
+        if (sign * vRinv_CtrMinusV[orthogDim] + cubeRange < 0.0)
+        {
+          frontFaces[numFrontFaces++] = faceIdx;
+        }
+        else
+        {
+          // This is a back face. Add the face's triangle corners to data.
+          var   tCornerIdx = faceIdx * T_CORNERS_PER_FACE;
+          const tCornerEnd = tCornerIdx + T_CORNERS_PER_FACE;
+
+          for(; tCornerIdx < tCornerEnd; ++tCornerIdx)
+          {
+            backFaceUints[numBackFaceUints++] =
+              triangleCorners[tCornerIdx] | rightEyeFlag | (orthogDim << 4);
+          }
+        }
+      }
+
+      if ((numFrontFaces < 1) || (numFrontFaces > 3))
+      {
+        const errorMsg =
+          "ERROR: The cube has " + numFrontFaces + " front faces.";
+        console.log(errorMsg);
+        alert(errorMsg);
+        return;
+      }
+
+      // Extend the list of front faces to 3, for the fragment shader.
+      faceIdx = frontFaces[numFrontFaces - 1];
+      while (numFrontFaces < 3)
+      {
+        frontFaces[numFrontFaces++] = faceIdx;
+      }
+    }
+
+    function dotProduct(v1, v2)
+    {
+      return (v1[0] * v2[0]) + (v1[1] * v2[1]) + (v1[2] * v2[2]);
+    }
+
+    // multMxV(m, v) returns a new vector.
+    // multMxV(m, v, destv) populates destv and returns destv.
+    function multMxV(m, v, destv)
+    {
+      if (!destv)
+      {
+        destv = [0.0, 0.0, 0.0];
+      }
+      const v0 = v[0];
+      const v1 = v[1];
+      const v2 = v[2];
+      destv[0] = m[0] * v0 + m[3] * v1 + m[6] * v2;
+      destv[1] = m[1] * v0 + m[4] * v1 + m[7] * v2;
+      destv[2] = m[2] * v0 + m[5] * v1 + m[8] * v2;
+
+      return destv;
+    }
+
+    // multMxM(m1, m2) returns a new matrix.
+    // multMxM(m1, m2, destm) populates destm and returns destm.
+    function multMxM(m1, m2, destm)
+    {
+      if (!destm)
+      {
+        destm = [0.0, 0.0, 0.0,  0.0, 0.0, 0.0,  0.0, 0.0, 0.0];
+      }
+      var col;
+      for (col = 0; col < 9; col += 3)
+      {
+        const tmp0 = m2[col  ];
+        const tmp1 = m2[col+1];
+        const tmp2 = m2[col+2];
+        destm[col  ] = m1[0] * tmp0 + m1[3] * tmp1 + m1[6] * tmp2;
+        destm[col+1] = m1[1] * tmp0 + m1[4] * tmp1 + m1[7] * tmp2;
+        destm[col+2] = m1[2] * tmp0 + m1[5] * tmp1 + m1[8] * tmp2;
+      }
+      return destm;
+    }
+
+    // addV(v1, v2) returns a new vector.
+    // addV(v1, v2, destv) populates destv and returns destv.
+    function addV(v1, v2, destv)
+    {
+      if (!destv)
+      {
+        destv = [0.0, 0.0, 0.0];
+      }
+      destv[0] = v1[0] + v2[0];
+      destv[1] = v1[1] + v2[1];
+      destv[2] = v1[2] + v2[2];
+      return destv;
+    }
+
+    // subV(v1, v2) returns a new vector.
+    // subV(v1, v2, destv) populates destv and returns destv.
+    function subV(v1, v2, destv)
+    {
+      if (!destv)
+      {
+        destv = [0.0, 0.0, 0.0];
+      }
+      destv[0] = v1[0] - v2[0];
+      destv[1] = v1[1] - v2[1];
+      destv[2] = v1[2] - v2[2];
+      return destv;
+    }
+
+    function setupDisplayAttributes()
+    {
+      // This function performs significant activity only if the
+      // canvas size has changed or the stereo mode has changed.
+
+      const newWidth  = gl.drawingBufferWidth;
+      const newHeight = gl.drawingBufferHeight;
+      const newStereoMode =
+        document.querySelector('input[name="stereoModeGroup"]:checked').value;
+
+      if ((newWidth      == canvasWidth ) &&
+          (newHeight     == canvasHeight) &&
+          (newStereoMode == stereoMode  )    )
+      {
+        return;
+      }
+
+      canvasWidth  = newWidth;
+      canvasHeight = newHeight;
+      stereoMode   = newStereoMode;
+
+      const minWidthHeight = ((canvasWidth < canvasHeight) ? canvasWidth
+                                                           : canvasHeight);
+
+      // Divide the display range by the smaller of the two pixel ranges.
+      pixelEdgeLength = 2.0 / minWidthHeight;
+
+      const trueEyeSeparation = 2.0 * (240 / minWidthHeight);
+      // Consider multiplying the eye separation to increase the stereo effect.
+      const eyeSeparation = trueEyeSeparation * 1.0;
+      var   distanceEyeToCubeCtr;
+
+      switch(stereoMode)
+      {
+        case STEREO_MODE:
+          // Keep the cube small, so that we can place it closer
+          // to the viewer without overlapping the stereo images.
+          cubeRange = 0.1875 * eyeSeparation; // 3/16 * eyeSeparation;
+
+          viewerLeft  = [-0.5 * eyeSeparation, 0, VIEWER_Z];
+          viewerRight = [ 0.5 * eyeSeparation, 0, VIEWER_Z];
+
+          const cubeCenter = [0.0, 0.0, 0.0]; // on the screen plane
+
+          const deltaX = cubeCenter[0] - viewerLeft[0];
+          const deltaZ = cubeCenter[2] - viewerLeft[2];
+          distanceEyeToCubeCtr = Math.sqrt(deltaX * deltaX + deltaZ * deltaZ);
+
+          // To avoid overlapping the 2 image cubes, we rotate the left and
+          // right worlds apart slightly, in effect relaxing the eyes.
+
+          const relaxSin = 2.0 * cubeRange / distanceEyeToCubeCtr;
+          const relaxCos = Math.sqrt(1.0 - relaxSin * relaxSin);
+          relaxLeft = [relaxCos, 0,-relaxSin, 0, 1, 0, relaxSin, 0, relaxCos];
+          relaxRight= [relaxCos, 0, relaxSin, 0, 1, 0,-relaxSin, 0, relaxCos];
+
+          cubeCenterLeft =
+            addV(multMxV(relaxLeft , subV(cubeCenter, viewerLeft)),
+                 viewerLeft);
+
+          cubeCenterRight =
+            addV(multMxV(relaxRight, subV(cubeCenter, viewerRight)),
+                 viewerRight);
+          break;
+
+        case MONO_MODE:
+          cubeRange = 0.1875 * eyeSeparation; //same as stereo; display in mono
+
+          viewerLeft = viewerRight = [0, 0, VIEWER_Z];
+          cubeCenterLeft = cubeCenterRight = [0.0, 0.0, 0.0]; //on screen plane
+
+          distanceEyeToCubeCtr = Math.abs(cubeCenterLeft[2] - viewerLeft[2]);
+          break;
+
+        case LARGE_MONO_MODE:
+          cubeRange = 0.5; // larger
+
+          viewerLeft = viewerRight = [0, 0, VIEWER_Z];
+          cubeCenterLeft = cubeCenterRight = [0.0, 0.0, -cubeRange];
+
+          distanceEyeToCubeCtr = Math.abs(cubeCenterLeft[2] - viewerLeft[2]);
+          break;
+
+        default:
+          const errorMsg = "ERROR: Stereo mode is unexpected value '"
+                           + stereoMode + "'";
+          console.log(errorMsg);
+          alert(errorMsg);
+          return;
+      }
+
+      gl.viewport(0, 0, canvasWidth, canvasHeight);
+
+      //-----------------------------------------------------------------------
+
+      gl.useProgram(mp.program);
+      setFirmUniforms(mp);
+
+      gl.uniform1f(mp.cubeRangeLoc   , cubeRange);
+      gl.uniform1f(mp.pixelEdgeLenLoc, pixelEdgeLength);
+
+      // The line of sight that starts at the viewer, goes through a pixel, and
+      // ends at a corner of the cube is some multiple t of (pixel - viewer).
+      // The minimum (or maximum) possible value of t occurs when the cube
+      // corner is closest to (or farthest away from) the viewer.
+
+      const tAtCubeCenter = (VIEWER_Z - cubeCenterLeft[2]) / VIEWER_Z;
+      gl.uniform1f(mp.minStableTLoc,
+                   0.99 * tAtCubeCenter *
+                   (distanceEyeToCubeCtr - SQRT_3 * cubeRange)
+                   / distanceEyeToCubeCtr);
+      gl.uniform1f(mp.maxStableTLoc,
+                   1.01 * tAtCubeCenter *
+                   (distanceEyeToCubeCtr + SQRT_3 * cubeRange)
+                   / distanceEyeToCubeCtr);
+
+      //-----------------------------------------------------------------------
+
+      gl.useProgram(ucp.program);
+      setFirmUniforms(ucp);
+
+      //-----------------------------------------------------------------------
+
+      gl.useProgram(rtp.program);
+      setFirmUniforms(rtp);
+      gl.uniform1f(rtp.cubeRangeLoc, cubeRange * 1.01);
+    }
+
+    function setFirmUniforms(p)
+    {
+      gl.uniform3fv(p.viewerLeftLoc     , viewerLeft);
+      gl.uniform3fv(p.viewerRightLoc    , viewerRight);
+      gl.uniform3fv(p.cubeCenterLeftLoc , cubeCenterLeft);
+      gl.uniform3fv(p.cubeCenterRightLoc, cubeCenterRight);
+
+      // Adjust shader calculations for aspect ratio.
+      if (canvasHeight < canvasWidth)
+      {
+        gl.uniform2f(p.aspectAdjustLoc, canvasWidth / canvasHeight, 1.0);
+      }
+      else
+      {
+        gl.uniform2f(p.aspectAdjustLoc, 1.0, canvasHeight / canvasWidth);
+      }
+    }
+
+    function setupTextureStore()
+    {
+      // If this is our first render, or if the canvas size has changed,
+      // create texture "accumulatorTexture".
+      //
+      const width  = gl.drawingBufferWidth;
+      const height = gl.drawingBufferHeight;
+      if ((width != textureWidth) || (height != textureHeight))
+      {
+        const oldTexture = accumulatorTexture;
+
+        accumulatorTexture = gl.createTexture();
+        gl.bindTexture(gl.TEXTURE_2D, accumulatorTexture);
+        gl.texStorage2D(gl.TEXTURE_2D, 1, gl.RGBA32F, width, height);
+        textureWidth  = width;
+        textureHeight = height;
+
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+
+        gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0,
+                                gl.TEXTURE_2D, accumulatorTexture, 0);
+
+        const framebufferStatus = gl.checkFramebufferStatus(gl.FRAMEBUFFER);
+        if (framebufferStatus != gl.FRAMEBUFFER_COMPLETE)
+        {
+          const errorMsg =
+            "ERROR: gl.checkFramebufferStatus(gl.FRAMEBUFFER) returns " +
+            frameBufferStatus + " instead of " + gl.FRAMEBUFFER_COMPLETE +
+                                              " (gl.FRAMEBUFFER_COMPLETE).";
+          console.log(errorMsg);
+          alert(errorMsg);
+          return false;
+        }
+
+        // Clear the texture.
+        gl.useProgram(cap.program);
+        doDrawArrays(cap, clearAllUints, clearAllUints.length, gl.TRIANGLES);
+
+        if (oldTexture)
+        {
+          gl.deleteTexture(oldTexture);
+        }
+      }
+
+      return true;
+    }
+
+    function resetSliders()
+    {
+      setSliders( 8, 0.0, 1.0, 1.0, 1.0);
+    }
+
+    function slidersPreset1()
+    {
+      setSliders(12, 0.0, 0.0, 1.5, 0.0);
+    }
+
+    function slidersPreset2()
+    {
+      setSliders( 3, 0.3, 1.5, 1.5, 1.5);
+    }
+
+    function setSliders(freq, edges, red, green, blue)
+    {
+      setFreqSliderText ( frequencySlider.value       = freq  );
+      setEdgesSliderText( edgesSlider.value           = edges );
+      setRedSliderText  ( redMultiplierSlider.value   = red   );
+      setGreenSliderText( greenMultiplierSlider.value = green );
+      setBlueSliderText ( blueMultiplierSlider.value  = blue  );
+    }
+
+    function setFreqSliderText(value)
+    {
+      frequencyText.value = Number(value).toFixed(0);
+    }
+
+    function setEdgesSliderText(value)
+    {
+      edgesText.value = Number(value).toFixed(4);
+    }
+
+    function setRedSliderText(value)
+    {
+      redMultiplierText.value = Number(value).toFixed(4);
+    }
+
+    function setGreenSliderText(value)
+    {
+      greenMultiplierText.value = Number(value).toFixed(4);
+    }
+
+    function setBlueSliderText(value)
+    {
+      blueMultiplierText.value = Number(value).toFixed(4);
+    }
+
+    function clickAutoRotate()
+    {
+      switch(autoRotateButton.innerHTML)
+      {
+        case RUN_AUTO_ROTATE : runAutoRotate() ; break;
+        case STOP_AUTO_ROTATE: stopAutoRotate(); break;
+        default:
+          const errorMsg = "ERROR: autoRotateButton has unexpected innerHTML '"
+                           + autoRotateButton.innerHTML + "'";
+          console.log(errorMsg);
+          alert(errorMsg);
+          stopAutoRotate();
+          break;
+      }
+    }
+
+    function runAutoRotate()
+    {
+      autoRotateIsRunning = true;
+      autoRotateButton.innerHTML = STOP_AUTO_ROTATE;
+
+      fpsCount = 0;
+      fpsStartTime = performance.now();
+      window.requestAnimationFrame(loopAutoRotate);
+    }
+
+    function loopAutoRotate(timestamp)
+    {
+      if (autoRotateIsRunning)
+      {
+        const halfPixel = 0.5 * pixelEdgeLength;
+        rotate( [ -halfPixel, -halfPixel, 0.5 ],
+                [  halfPixel,  halfPixel, 0.5 ] );
+        draw();
+
+        ++fpsCount;
+        const newTime = performance.now();
+        if (newTime - fpsStartTime >= 1000.0)
+        {
+          const rateValue = 1000.0 * fpsCount / (newTime - fpsStartTime);
+          fpsText.value = "FPS = " + rateValue.toFixed(1);
+          fpsCount = 0;
+          fpsStartTime = performance.now();
+        }
+
+        window.requestAnimationFrame(loopAutoRotate);
+      }
+    }
+
+    function stopAutoRotate()
+    {
+      autoRotateIsRunning = false;
+      autoRotateButton.innerHTML = RUN_AUTO_ROTATE;
+    }
+
+    function mouseDownEvent(event)
+    {
+      mouseIsDown = true;
+      prevMouseX = event.clientX;
+      prevMouseY = event.clientY;
+      stopAutoRotate();
+    }
+
+    function mouseUpEvent(event)
+    {
+      mouseIsDown = false;
+    }
+
+    function mouseMoveEvent(event)
+    {
+      if (!mouseIsDown)
+      {
+        return;
+      }
+
+      const newX = event.clientX;
+      const newY = event.clientY;
+
+      if ((newX == prevMouseX) && (newY == prevMouseY))
+      {
+        return;
+      }
+
+      setupDisplayAttributes();
+
+      // Convert the mouse movement into "from" & "to" vectors for a rotation.
+
+      // Note: Mouse coord Y goes downward, but vertex coord Y goes upward.
+      const deltaX =  (newX - prevMouseX) * pixelEdgeLength;
+      const deltaY = -(newY - prevMouseY) * pixelEdgeLength;
+
+      rotate( [ -0.5 * deltaX, -0.5 * deltaY, cubeRange * SQRT_3 ],
+              [  0.5 * deltaX,  0.5 * deltaY, cubeRange * SQRT_3 ] );
+      draw();
+
+      prevMouseX = newX;
+      prevMouseY = newY;
+    }
+  </script>
+
+  <!-- Shaders
+     -
+     - In these shaders, we perform dynamic indexing only on vectors and
+     - matrices, not on arrays.  Some GLSL ES 3 implementations apparently
+     - fail to perform dynamic indexing on arrays, even constant arrays.
+    -->
+
+  <script id="cornerVShader" type="glsl">#version 300 es
+    precision highp float;
+
+    uniform  float cubeRange;
+    uniform  vec2  aspectAdjust;
+    uniform  vec3  viewerLeft;
+    uniform  vec3  viewerRight;
+    uniform  vec3  cubeCenterLeft;
+    uniform  vec3  cubeCenterRight;
+    uniform  mat3  RLeft;
+    uniform  mat3  RRight;
+
+    in       uint  cornerInfo;
+    flat out uint  fragmentCornerInfo;
+
+    void main()
+    {
+      vec3 viewer;
+      vec3 cubeCenter;
+      mat3 R;
+
+      // These sequentialized if and else clauses are cheap:
+      if ((cornerInfo & 0x8u) != 0u)
+      {
+        viewer     = viewerRight;
+        cubeCenter = cubeCenterRight;
+        R          = RRight;
+      }
+      else
+      {
+        viewer     = viewerLeft;
+        cubeCenter = cubeCenterLeft;
+        R          = RLeft;
+      }
+
+      // Forward cornerInfo to the fragment shader:
+      fragmentCornerInfo = cornerInfo;
+
+      // Convert cornerInfo to corner = cubeRange * (+-1.0, +-1.0, +-1.0):
+      vec3 corner = cubeRange * (vec3((cornerInfo & 0x1u) << 1u,
+                                      (cornerInfo & 0x2u),
+                                      (cornerInfo & 0x4u) >> 1u) - 1.0);
+
+      // Calculate the position of the cube corner on the image.
+      //
+      corner = R * corner + cubeCenter;
+      gl_Position = vec4((corner.z * viewer.xy - viewer.z * corner.xy)
+                         / (corner.z - viewer.z)
+                         / aspectAdjust,
+                         0.0,
+                         1.0);
+    }
+  </script>
+
+  <script id="canvasVShader" type="glsl">#version 300 es
+    precision highp float;
+
+    in uint cornerInfo;
+
+    void main()
+    {
+      // cornerInfo 0 -> gl_Position (-1.0,-1.0, 0.0, 1.0);
+      // cornerInfo 1 -> gl_Position ( 1.0,-1.0, 0.0, 1.0);
+      // cornerInfo 2 -> gl_Position (-1.0, 1.0, 0.0, 1.0);
+      // cornerInfo 3 -> gl_Position ( 1.0, 1.0, 0.0, 1.0);
+
+      gl_Position = vec4(vec2((cornerInfo & 1u) << 1u, cornerInfo & 2u) - 1.0,
+                         0.0, 1.0);
+    }
+  </script>
+
+  <script id="mainFShader" type="glsl">#version 300 es
+    precision highp float;
+
+    const uvec3   onePlusDmod3 = uvec3(1, 2, 0);
+    const uvec3   twoPlusDmod3 = uvec3(2, 0, 1);
+    const uvec3 zeroMinusDmod3 = uvec3(0, 2, 1);
+    const uvec3  oneMinusDmod3 = uvec3(1, 0, 2);
+    const uvec3  twoMinusDmod3 = uvec3(2, 1, 0);
+
+    uniform float cubeRange;
+    uniform vec2  aspectAdjust;
+    uniform float minStableT;
+    uniform float maxStableT;
+    uniform float pixelEdgeLen;
+    uniform float twoPIxFreq;
+    uniform vec3  colorMultipliers;
+    uniform vec3  viewerLeft;
+    uniform vec3  viewerRight;
+    uniform vec3  cubeCenterLeft;
+    uniform vec3  cubeCenterRight;
+    uniform uvec3 frontFacesLeft;
+    uniform uvec3 frontFacesRight;
+    uniform mat3  RLeft;
+    uniform mat3  RRight;
+
+    flat in uint  fragmentCornerInfo;
+    out     vec4  outputColor;
+
+    void main()
+    {
+      vec3  viewer;
+      vec3  cubeCenter;
+      uvec3 frontFaces;
+      mat3  R;
+
+      // These sequentialized if and else clauses are cheap:
+      if ((fragmentCornerInfo & 0x8u) != 0u)
+      {
+        viewer     = viewerRight;
+        cubeCenter = cubeCenterRight;
+        frontFaces = frontFacesRight;
+        R          = RRight;
+      }
+      else
+      {
+        viewer     = viewerLeft;
+        cubeCenter = cubeCenterLeft;
+        frontFaces = frontFacesLeft;
+        R          = RLeft;
+      }
+
+      uint  orthogDim   = fragmentCornerInfo >> 4;
+      float posAlongDim = (((fragmentCornerInfo & (1u << orthogDim)) != 0u)
+                            ? cubeRange : -cubeRange);
+
+      vec3 pixelXYZ = vec3(pixelEdgeLen * gl_FragCoord.xy - aspectAdjust, 0.0);
+
+      // Calculate Rinverse * (pixel - viewer).  Note that R is an orthogonal
+      // matrix; so Rinverse == Rtransponse.  Therefore,
+      //
+      //   Rinverse * (P-V) = Rtranspose * (P-V) = (P-V)transpose * R
+      //
+      vec3 Rinv_PminusV = (pixelXYZ - viewer) * R;
+
+      // Calculate Rinverse*(cubeCenter-viewer). Again, Rinverse == Rtranspose.
+      // (Rinv_CtrMinusV arguably belongs in a uniform variable.)
+      vec3 Rinv_CtrMinusV = (cubeCenter - viewer) * R;
+
+      float Rinv_CtrMinusV_dim_pluspAlongD = Rinv_CtrMinusV[orthogDim] +
+                                             posAlongDim;
+      float Rinv_PminusV_dim = Rinv_PminusV[orthogDim];
+
+      // A line of sight going from the viewer through the center
+      // of the pixel intersects what point of the back face?
+      //
+
+      vec3 tmp = Rinv_CtrMinusV_dim_pluspAlongD * Rinv_PminusV
+                 - Rinv_PminusV_dim * Rinv_CtrMinusV;
+
+      vec2 solve = vec2(tmp[onePlusDmod3[orthogDim]],
+                        tmp[twoPlusDmod3[orthogDim]])
+                   / Rinv_PminusV_dim;
+
+      // We say that the solve (using 32-bit floats) is successful if the
+      // results fall within (cubeRange * generous numeric error):
+      float stableSolve = cubeRange * 1.1;
+
+      vec3 result = vec3(0.0, 0.0, 0.0);
+      if (all(lessThan(abs(solve), vec2(stableSolve))))
+      {
+        // Calculate the multiple of vector (pixelXYZ - viewer) that goes from
+        // the viewer to the plane of the triangle.  We name that multiple
+        // "backT" because this is a back face.
+
+        float backT = Rinv_CtrMinusV_dim_pluspAlongD / Rinv_PminusV_dim;
+
+        // Permute face coordinates to cube coordinates.  Specifically,
+        //
+        //   permute posAlongDim to cubeBackXYZ[ orthogDim         ],
+        //   permute solve.x     to cubeBackXYZ[(orthodDim + 1) % 3], and
+        //   permute solve.y     to cubeBackXYZ[(orthogDim + 2) % 3].
+
+        tmp = vec3(posAlongDim, solve);
+        vec3 cubeBackXYZ = vec3(tmp[zeroMinusDmod3[orthogDim]],
+                                tmp[ oneMinusDmod3[orthogDim]],
+                                tmp[ twoMinusDmod3[orthogDim]]);
+
+        // Now, inspect the cube's (up to) three front faces.
+        //
+        // If a front face is 0 or 1, then the orthogonal dimension is 0.
+        // If a front face is 2 or 3, then the orthogonal dimension is 1.
+        // If a front face is 4 or 5, then the orthogonal dimension is 2.
+        //
+        uvec3 frontOrthogDims = frontFaces / 2u;
+
+        // For an even face, the position along orthogonal dim is -cubeRange.
+        // For an odd  face, the position along orthogonal dim is  cubeRange.
+        //
+        vec3 frontPosesAlongDim = ((vec3(frontFaces & 1u) * 2.0) - 1.0)
+                                  * cubeRange;
+
+        // For each of the (up to) three front faces,
+        //   calculate the multiple of vector (pixelXYZ - viewer) that goes
+        //   from the viewer to the plane of the front face.
+        //
+        vec3 t = ( vec3(Rinv_CtrMinusV[frontOrthogDims[0]],
+                        Rinv_CtrMinusV[frontOrthogDims[1]],
+                        Rinv_CtrMinusV[frontOrthogDims[2]])
+                   + frontPosesAlongDim )
+                 / vec3(Rinv_PminusV[frontOrthogDims[0]],
+                        Rinv_PminusV[frontOrthogDims[1]],
+                        Rinv_PminusV[frontOrthogDims[2]]);
+
+        // Isolate the front face that has the largest t value.
+        // (The max operation is implemented below as three sequential "if"
+        //  tests because I have not found an elegant parallelization of the
+        //  max operation that will correctly handle numbers such as NaN.)
+        //
+        // One of the (up to) 3 front faces should have yielded a stable t.
+
+        float largestFrontT = (((minStableT < t[0]) && (t[0] < maxStableT))
+                               ? t[0] : minStableT);
+        uint  frontPlane = 0u;
+
+        if ((largestFrontT < t[1]) && (t[1] < maxStableT))
+        {
+          largestFrontT = t[1];
+          frontPlane = 1u;
+        }
+
+        if ((largestFrontT < t[2]) && (t[2] < maxStableT))
+        {
+          largestFrontT = t[2];
+          frontPlane = 2u;
+        }
+
+        uint  frontOrthogDim   = frontOrthogDims[frontPlane];
+        float frontPosAlongDim = frontPosesAlongDim[frontPlane];
+
+        // A line of sight going from the viewer through the center
+        // of the pixel intersects what point of the front face?
+        //
+        tmp = (Rinv_CtrMinusV[frontOrthogDim] + frontPosAlongDim) * Rinv_PminusV
+              - Rinv_PminusV[frontOrthogDim] * Rinv_CtrMinusV;
+
+        solve = vec2(tmp[onePlusDmod3[frontOrthogDim]],
+                     tmp[twoPlusDmod3[frontOrthogDim]])
+                / Rinv_PminusV[frontOrthogDim];
+
+        if (all(lessThan(abs(solve), vec2(stableSolve))))
+        {
+          // Permute front face coordinates to cube coordinates.  Specifically,
+          //
+          //  permute frontPosAlongDim to cubeFrontXYZ[ frontOrthogDim       ],
+          //  permute solve.x          to cubeFrontXYZ[(frontOrthogDim+1) % 3],
+          //  permute solve.y          to cubeFrontXYZ[(frontOrthogDim+2) % 3].
+
+          tmp = vec3(frontPosAlongDim, solve);
+          vec3 cubeFrontXYZ = vec3(tmp[zeroMinusDmod3[frontOrthogDim]],
+                                   tmp[ oneMinusDmod3[frontOrthogDim]],
+                                   tmp[ twoMinusDmod3[frontOrthogDim]]);
+
+          // Calculate the line-of-sight integral of the following
+          // element-wise brightness function, from t=0 to t=1:
+          //
+          //                2 Pi freq  [frontX]    [backX-frontX]
+          // 0.5 - 0.5 cos(---------- ([frontY] + t[backY-frontY] + cubeRange))
+          //               2 cubeRange [frontZ]    [backZ-frontZ]
+          //
+          //                                            [frontX]
+          // where the line of sight enters the cube at [frontY] (in cube
+          //                                            [frontZ]
+          //                                                       [backX]
+          // coordinates), and the line of sight exits the cube at [backY].
+          //                                                       [backZ]
+
+          // Near the outline of the cube image, numerical errors might place
+          // frontXYZ behind backXYZ.  To help avoid the line integral in such
+          // cases, we set deltaXYZ to a non-zero only if the line of sight to
+          // the front face is shorter than the line of sight to the back face.
+          //
+          vec3 deltaXYZ = vec3(0.0);
+          if (largestFrontT < backT)
+          {
+            deltaXYZ = cubeBackXYZ - cubeFrontXYZ;
+          }
+
+          vec3 integral = 0.5 - (0.5 / twoPIxFreq) / deltaXYZ
+                                *
+                                ( sin(twoPIxFreq * (cubeBackXYZ  + cubeRange))
+                                  -
+                                  sin(twoPIxFreq * (cubeFrontXYZ + cubeRange))
+                                );
+
+          // Dividing by a zero or near-zero deltaXYZ value is dangerous.
+          // For deltaXYZ values smaller than 2/(1024 twoPIxFreq), we use the
+          // brightness function itself to approximate the line integral with
+          // an error within (1/1024).  This error is small enough, because it
+          // is at most one brightness level on expensive displays that use 10
+          // bits for each primary color.  Most mainstream displays today use a
+          // coarser 8 bits for each primary color.
+          //
+          vec3 brightness =
+            0.5 - 0.5 * cos(twoPIxFreq *
+                            (0.5 * (cubeFrontXYZ + cubeBackXYZ) + cubeRange));
+
+          bvec3 deltaIsNearZero =
+            lessThan(abs(deltaXYZ), vec3((2.0/1024.0) / twoPIxFreq));
+
+          // I could not find an element-wise ternary ?: function.
+          // Using 0.0 and 1.0 multipliers to implement an element-wise ternary
+          // might not work on infinites and NaN. So I use three if statements:
+          //
+          if (deltaIsNearZero[0]) { integral[0] = brightness[0]; }
+          if (deltaIsNearZero[1]) { integral[1] = brightness[1]; }
+          if (deltaIsNearZero[2]) { integral[2] = brightness[2]; }
+
+          // To complete the calculation of the line integral, we multiply
+          // the result by ds/dt = length(cubeFrontXYZ, cubeBackXYZ).
+          //
+          // Also, we divide the brightness by the maximum possible integral
+          // value, (2 sqrt(2) cubeRange), to protect against saturation:
+
+          integral *= (length(deltaXYZ) /
+                       ((2.0*1.4142135623730951) * cubeRange));
+
+          // For simple tests, try an integral of a constant function,
+          // with saturation protector (sqrt(3) * 2 * cubeRange):
+          //integral = vec3(1.0, 1.0, 1.0) * length(deltaXYZ)
+          //           / (sqrt(3.0) * 2.0 * cubeRange);
+
+          // For testing, display the front surface value:
+          //integral = 0.5 - 0.5 * cos(twoPIxFreq*(cubeFrontXYZ + cubeRange));
+
+          // Apply the slider color multipliers:
+          result = vec3(integral * colorMultipliers);
+
+          // Show saturated pixels, which can occur when color sliders > 1:
+          //if (any(greaterThan(result, vec3(1.0))))
+          //{
+          //  result = vec3(1.0, 0.0, 0.0);
+          //}
+
+          // Show the pixels where we approximated the integral:
+          //if (any(deltaIsNearZero))
+          //{
+          //  result = vec3(1.0, 0.0, 0.0);
+          //}
+        }
+      }
+
+      outputColor = vec4(result, 1.0);
+    }
+  </script>
+
+  <script id="readTexFShader" type="glsl">#version 300 es
+    precision highp float;
+    precision highp int;
+
+    uniform sampler2D sampler;
+    out     vec4      outputColor;
+
+    void main()
+    {
+      outputColor = texelFetch(
+        sampler, ivec2(int(gl_FragCoord.x), int(gl_FragCoord.y)), 0);
+    }
+  </script>
+
+  <script id="uniformFShader" type="glsl">#version 300 es
+    precision highp float;
+
+    uniform vec4 uniformColor;
+    out     vec4 outputColor;
+
+    void main()
+    {
+      outputColor = uniformColor;
+    }
+  </script>
+</html>
