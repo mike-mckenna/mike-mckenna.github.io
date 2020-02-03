@@ -63,20 +63,18 @@
           <table>
             <tr class="tr-align-top">
               <td class="td-padding">
+                <input type="radio" name="displayTypeGroup" checked
+                       value="opaqueCube"   onclick="draw()">Opaque Cube<br>
+                <input type="radio" name="displayTypeGroup"
+                       value="linesNPoints" onclick="draw()">Lines &amp; Points
+              </td>
+              <td class="td-padding">
                 <input type="radio" name="stereoModeGroup" checked
                        value="stereo"    onclick="draw()"> Stereo<br>
                 <input type="radio" name="stereoModeGroup"
                        value="mono"      onclick="draw()"> Mono<br>
                 <input type="radio" name="stereoModeGroup"
                        value="largeMono" onclick="draw()"> Large Mono
-              </td>
-              <td class="td-padding">
-                <input type="radio" name="displayTypeGroup" checked
-                       value="opaqueCube"   onclick="draw()"
-                       >Opaque Cube<br>
-                <input type="radio" name="displayTypeGroup"
-                       value="linesAndPoints" onclick="draw()"
-                       >Lines &amp; Points<br>
               </td>
               <td class="td-padding">
                 <input type="radio" name="backgroundGroup" checked
@@ -157,7 +155,7 @@
     const LARGE_MONO_MODE  = "largeMono";
 
     const OPAQUE_CUBE      = "opaqueCube";
-    const LINES_AND_POINTS = "linesAndPoints";
+    const LINES_AND_POINTS = "linesNPoints";
 
     const WHITE            = "white";
     const BLACK            = "black";
@@ -474,7 +472,7 @@
 
       // Draw the first image.
       //
-      rotate( [ 0, 0, 1 ], [ 0.16, -0.15, 1 ] );
+      rotate( [ 0, 0, 1 ], [ 0.5, -0.25, 1 ] );
       draw();
 
       // Define functions that will respond to mouse actions and redraw.
